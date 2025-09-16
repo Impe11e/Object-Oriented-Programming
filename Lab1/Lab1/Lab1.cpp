@@ -11,7 +11,6 @@ WCHAR szTitle[MAX_LOADSTRING];
 WCHAR szWindowClass[MAX_LOADSTRING];
 WCHAR text[256];
 WCHAR numberText[16];
-int selectedValue;
 bool showScrollNumber = false;
 
 
@@ -128,10 +127,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             if (showScrollNumber) {
-                _itow_s(selectedValue, numberText, 16, 10);
                 TextOut(hdc, 20, 50, numberText, wcslen(numberText));
             }
-            else TextOut(hdc, 20, 50, text, wcslen(text));
+            else {
+                TextOut(hdc, 20, 50, text, wcslen(text));
+            }
             EndPaint(hWnd, &ps);
         }
         break;
@@ -171,7 +171,9 @@ void doWork1(HWND hWnd) {
 }
 
 void doWork2(HWND hWnd) {
-    if (Func_MOD2(hWnd, hInst, &selectedValue) == 1) {
+    int localSelectedValue = 0;
+    if (Func_MOD2(hWnd, hInst, &localSelectedValue) == 1) {
+        _itow_s(localSelectedValue, numberText, 16, 10);
         showScrollNumber = true;
         InvalidateRect(hWnd, 0, TRUE);
     }
