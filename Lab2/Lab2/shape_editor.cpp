@@ -1,23 +1,25 @@
 ﻿#include "shape_editor.h"
 #include "Lab2.h"
 
-// PointEditor - максимально простой!
 void PointEditor::OnLBdown(HWND hWnd) {
+    if (*shapeCount >= arraySize) {
+        MessageBox(hWnd, L"Масив заповнен!", L"Попередження", MB_OK);
+        return;
+    }
+
     POINT pt = GetMousePos(hWnd);
-    shapes.push_back(new PointShape());
-    shapes.back()->Set(pt.x, pt.y, pt.x, pt.y);
+    pcshape[*shapeCount] = new PointShape();
+    pcshape[*shapeCount]->Set(pt.x, pt.y, pt.x, pt.y);
+    (*shapeCount)++;
     Invalidate(hWnd);
 }
 
 void PointEditor::OnLBup(HWND hWnd) {
-    // Для точки ничего не делаем
 }
 
 void PointEditor::OnMouseMove(HWND hWnd) {
-    // Для точки ничего не делаем
 }
 
-// LineEditor - лаконичный с trail системой
 void LineEditor::OnLBdown(HWND hWnd) {
     startPoint = GetMousePos(hWnd);
     delete trail;
@@ -28,7 +30,16 @@ void LineEditor::OnLBdown(HWND hWnd) {
 
 void LineEditor::OnLBup(HWND hWnd) {
     if (trail) {
-        shapes.push_back(trail);
+        if (*shapeCount >= arraySize) {
+            MessageBox(hWnd, L"Масив заповнен!", L"Попередження", MB_OK);
+            delete trail;
+            trail = nullptr;
+            ReleaseCapture();
+            return;
+        }
+
+        pcshape[*shapeCount] = trail;
+        (*shapeCount)++;
         trail = nullptr;
         ReleaseCapture();
         Invalidate(hWnd);
@@ -43,7 +54,6 @@ void LineEditor::OnMouseMove(HWND hWnd) {
     }
 }
 
-// RectEditor - сокращен в 3 раза!
 void RectEditor::OnLBdown(HWND hWnd) {
     startPoint = GetMousePos(hWnd);
     delete trail;
@@ -54,7 +64,16 @@ void RectEditor::OnLBdown(HWND hWnd) {
 
 void RectEditor::OnLBup(HWND hWnd) {
     if (trail) {
-        shapes.push_back(trail);
+        if (*shapeCount >= arraySize) {
+            MessageBox(hWnd, L"Масив заповнен!", L"Попередження", MB_OK);
+            delete trail;
+            trail = nullptr;
+            ReleaseCapture();
+            return;
+        }
+
+        pcshape[*shapeCount] = trail;
+        (*shapeCount)++;
         trail = nullptr;
         ReleaseCapture();
         Invalidate(hWnd);
@@ -69,7 +88,6 @@ void RectEditor::OnMouseMove(HWND hWnd) {
     }
 }
 
-// EllipseEditor - сокращен в 3 раза с учетом варианта 28!
 void EllipseEditor::OnLBdown(HWND hWnd) {
     startPoint = GetMousePos(hWnd);
     delete trail;
@@ -80,7 +98,16 @@ void EllipseEditor::OnLBdown(HWND hWnd) {
 
 void EllipseEditor::OnLBup(HWND hWnd) {
     if (trail) {
-        shapes.push_back(trail);
+        if (*shapeCount >= arraySize) {
+            MessageBox(hWnd, L"Масив заповнен!", L"Попередження", MB_OK);
+            delete trail;
+            trail = nullptr;
+            ReleaseCapture();
+            return;
+        }
+
+        pcshape[*shapeCount] = trail;
+        (*shapeCount)++;
         trail = nullptr;
         ReleaseCapture();
         Invalidate(hWnd);
@@ -90,12 +117,11 @@ void EllipseEditor::OnLBup(HWND hWnd) {
 void EllipseEditor::OnMouseMove(HWND hWnd) {
     if (trail) {
         POINT pt = GetMousePos(hWnd);
-        
-        // Для эллипса от центра к углу (вариант 28)
+
         long deltaX = abs(pt.x - startPoint.x);
         long deltaY = abs(pt.y - startPoint.y);
-        trail->Set(startPoint.x - deltaX, startPoint.y - deltaY, 
-                   startPoint.x + deltaX, startPoint.y + deltaY);
+        trail->Set(startPoint.x - deltaX, startPoint.y - deltaY,
+            startPoint.x + deltaX, startPoint.y + deltaY);
         Invalidate(hWnd);
     }
 }

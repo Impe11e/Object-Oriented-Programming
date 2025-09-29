@@ -1,27 +1,40 @@
 ﻿#pragma once
 #include "editor.h"
 #include "resource.h"
-#include <vector>
+
+#define ARRAY_SIZE 128
 
 enum EditorType { POINT_EDITOR, LINE_EDITOR, RECT_EDITOR, ELLIPSE_EDITOR };
 
 class ShapeObjectsEditor {
 private:
-    std::vector<Shape*> shapes;
+    Shape* pcshape[ARRAY_SIZE];
+    int shapeCount;
     Editor* currentEditor;
     EditorType currentType;
     
 public:
-    ShapeObjectsEditor() : currentEditor(new PointEditor(shapes)), currentType(POINT_EDITOR) {}
+    ShapeObjectsEditor() : currentType(POINT_EDITOR) {
+        for (int i = 0; i < ARRAY_SIZE; i++) {
+            pcshape[i] = nullptr;
+        }
+        shapeCount = 0;
+        currentEditor = new PointEditor(pcshape, &shapeCount, ARRAY_SIZE);
+    }
+    
     ~ShapeObjectsEditor() {
-        for (auto shape : shapes) delete shape;
+        for (int i = 0; i < shapeCount; i++) {
+            if (pcshape[i] != nullptr) {
+                delete pcshape[i];
+            }
+        }
         delete currentEditor;
     }
 
-    void StartPointEditor() { delete currentEditor; currentEditor = new PointEditor(shapes); currentType = POINT_EDITOR; }
-    void StartLineEditor() { delete currentEditor; currentEditor = new LineEditor(shapes); currentType = LINE_EDITOR; }
-    void StartRectEditor() { delete currentEditor; currentEditor = new RectEditor(shapes); currentType = RECT_EDITOR; }
-    void StartEllipseEditor() { delete currentEditor; currentEditor = new EllipseEditor(shapes); currentType = ELLIPSE_EDITOR; }
+    void StartPointEditor() { delete currentEditor; currentEditor = new PointEditor(pcshape, &shapeCount, ARRAY_SIZE); currentType = POINT_EDITOR; }
+    void StartLineEditor() { delete currentEditor; currentEditor = new LineEditor(pcshape, &shapeCount, ARRAY_SIZE); currentType = LINE_EDITOR; }
+    void StartRectEditor() { delete currentEditor; currentEditor = new RectEditor(pcshape, &shapeCount, ARRAY_SIZE); currentType = RECT_EDITOR; }
+    void StartEllipseEditor() { delete currentEditor; currentEditor = new EllipseEditor(pcshape, &shapeCount, ARRAY_SIZE); currentType = ELLIPSE_EDITOR; }
 
     void OnLBdown(HWND hWnd) { currentEditor->OnLBdown(hWnd); }
     void OnLBup(HWND hWnd) { currentEditor->OnLBup(hWnd); }
