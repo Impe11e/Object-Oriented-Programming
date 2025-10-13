@@ -1,5 +1,5 @@
 ﻿#include "shape_editor.h"
-#include "Lab2.h"
+#include "Lab3.h"
 
 void PointEditor::OnLBdown(HWND hWnd) {
     if (*shapeCount >= arraySize) {

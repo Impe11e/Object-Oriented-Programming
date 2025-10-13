@@ -1,5 +1,5 @@
 ﻿#include "framework.h"
-#include "Lab2.h"
+#include "Lab3.h"
 #include "shape_editor.h"
 #include <commctrl.h>
 
@@ -13,15 +13,16 @@ WCHAR szWindowClass[MAX_LOADSTRING];
 ShapeObjectsEditor editor;
 HWND hToolbar = NULL;
 
+int currentTool = 0;
+
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 void UpdateWindowTitle(HWND hWnd);
-void UpdateToolbarButtons(int selectedButton);
 void OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam);
-void OnSize(HWND hWnd);
+void OnToolButton(HWND hWnd, int toolID);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -34,7 +35,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     InitCommonControls();
 
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_LAB2, szWindowClass, MAX_LOADSTRING);
+    LoadStringW(hInstance, IDC_LAB3, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
     if (!InitInstance (hInstance, nCmdShow))
@@ -42,7 +43,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return FALSE;
     }
 
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_LAB2));
+    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_LAB3));
     MSG msg;
 
     while (GetMessage(&msg, nullptr, 0, 0))
@@ -67,10 +68,10 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_LAB2));
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_LAB3));
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_LAB2);
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_LAB3);
     wcex.lpszClassName = szWindowClass;
     wcex.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
@@ -89,39 +90,52 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 
-   TBBUTTON tbb[4];
-   ZeroMemory(tbb, sizeof(tbb));
-   
-   tbb[0].iBitmap = 0;
-   tbb[0].fsState = TBSTATE_ENABLED;
-   tbb[0].fsStyle = TBSTYLE_BUTTON;
-   tbb[0].idCommand = ID_POINT;
-   
-   tbb[1].iBitmap = 1;
-   tbb[1].fsState = TBSTATE_ENABLED;
-   tbb[1].fsStyle = TBSTYLE_BUTTON;
-   tbb[1].idCommand = ID_LINE;
-   
-   tbb[2].iBitmap = 2;
-   tbb[2].fsState = TBSTATE_ENABLED;
-   tbb[2].fsStyle = TBSTYLE_BUTTON;
-   tbb[2].idCommand = ID_RECTANGLE;
-   
-   tbb[3].iBitmap = 3;
-   tbb[3].fsState = TBSTATE_ENABLED;
-   tbb[3].fsStyle = TBSTYLE_BUTTON;
-   tbb[3].idCommand = ID_ELLIPSE;
-   
-   hToolbar = CreateToolbarEx(hWnd,
-       WS_CHILD | WS_VISIBLE | WS_BORDER | WS_CLIPSIBLINGS | CCS_TOP | TBSTYLE_TOOLTIPS,
-       1000,
-       4,
-       hInstance,
-       IDB_TOOLBAR,
-       tbb,
-       4,
-       24, 24, 24, 24,
-       sizeof(TBBUTTON));
+   hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
+       WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | CCS_TOP | TBSTYLE_TOOLTIPS | TBSTYLE_WRAPABLE,
+       0, 0, 0, 0,
+       hWnd, (HMENU)1000, hInstance, NULL);
+
+   if (hToolbar)
+   {
+       SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
+       
+       HIMAGELIST hImageList = ImageList_Create(24, 24, ILC_COLOR32 | ILC_MASK, 4, 0);
+       HBITMAP hBitmap = LoadBitmap(hInstance, MAKEINTRESOURCE(IDB_TOOLBAR));
+       
+       if (hBitmap) {
+           ImageList_Add(hImageList, hBitmap, NULL);
+           DeleteObject(hBitmap);
+       }
+       
+       SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageList);
+       
+       TBBUTTON tbb[4];
+       ZeroMemory(tbb, sizeof(tbb));
+       
+       tbb[0].iBitmap = 0;
+       tbb[0].fsState = TBSTATE_ENABLED;
+       tbb[0].fsStyle = TBSTYLE_BUTTON;
+       tbb[0].idCommand = ID_POINT;
+       
+       tbb[1].iBitmap = 1;
+       tbb[1].fsState = TBSTATE_ENABLED;
+       tbb[1].fsStyle = TBSTYLE_BUTTON;
+       tbb[1].idCommand = ID_LINE;
+       
+       tbb[2].iBitmap = 2;
+       tbb[2].fsState = TBSTATE_ENABLED;
+       tbb[2].fsStyle = TBSTYLE_BUTTON;
+       tbb[2].idCommand = ID_RECTANGLE;
+       
+       tbb[3].iBitmap = 3;
+       tbb[3].fsState = TBSTATE_ENABLED;
+       tbb[3].fsStyle = TBSTYLE_BUTTON;
+       tbb[3].idCommand = ID_ELLIPSE;
+       
+       SendMessage(hToolbar, TB_ADDBUTTONS, 4, (LPARAM)&tbb);
+       
+       SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
+   }
 
    UpdateWindowTitle(hWnd);
 
@@ -142,16 +156,6 @@ void UpdateWindowTitle(HWND hWnd)
     wcscat_s(title, baseTitle);
     
     SetWindowTextW(hWnd, title);
-}
-
-void UpdateToolbarButtons(int selectedButton)
-{
-    if (!hToolbar) return;
-    
-    int buttons[] = {ID_POINT, ID_LINE, ID_RECTANGLE, ID_ELLIPSE};
-    for (int i = 0; i < 4; i++) {
-        SendMessage(hToolbar, TB_CHECKBUTTON, buttons[i], MAKELONG(buttons[i] == selectedButton, 0));
-    }
 }
 
 void OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
@@ -180,21 +184,37 @@ void OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
     }
 }
 
-void OnSize(HWND hWnd)
+void OnToolButton(HWND hWnd, int toolID)
 {
-    RECT rc, rw;
-    if (hToolbar)
-    {
-        GetClientRect(hWnd, &rc);
-        GetWindowRect(hToolbar, &rw);
-        
-        ScreenToClient(hWnd, (POINT*)&rw);
-        ScreenToClient(hWnd, ((POINT*)&rw) + 1);
-        
-        MoveWindow(hToolbar, 0, 0,
-            rc.right - rc.left,
-            rw.bottom - rw.top, TRUE);
+    if (currentTool == toolID) {
+        SendMessage(hToolbar, TB_PRESSBUTTON, currentTool, FALSE);
+        currentTool = 0;
+        return;
     }
+    
+    if (currentTool != 0) {
+        SendMessage(hToolbar, TB_PRESSBUTTON, currentTool, FALSE);
+    }
+    
+    currentTool = toolID;
+    SendMessage(hToolbar, TB_PRESSBUTTON, currentTool, TRUE);
+    
+    switch (toolID) {
+        case ID_POINT:
+            editor.StartPointEditor();
+            break;
+        case ID_LINE:
+            editor.StartLineEditor();
+            break;
+        case ID_RECTANGLE:
+            editor.StartRectEditor();
+            break;
+        case ID_ELLIPSE:
+            editor.StartEllipseEditor();
+            break;
+    }
+    
+    UpdateWindowTitle(hWnd);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -230,24 +250,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             switch (wmId)
             {
             case ID_POINT:
-                editor.StartPointEditor();
-                UpdateWindowTitle(hWnd);
-                UpdateToolbarButtons(ID_POINT);
-                break;
             case ID_LINE:
-                editor.StartLineEditor();
-                UpdateWindowTitle(hWnd);
-                UpdateToolbarButtons(ID_LINE);
-                break;
             case ID_RECTANGLE:
-                editor.StartRectEditor();
-                UpdateWindowTitle(hWnd);
-                UpdateToolbarButtons(ID_RECTANGLE);
-                break;
             case ID_ELLIPSE:
-                editor.StartEllipseEditor();
-                UpdateWindowTitle(hWnd);
-                UpdateToolbarButtons(ID_ELLIPSE);
+                OnToolButton(hWnd, wmId);
                 break;
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);

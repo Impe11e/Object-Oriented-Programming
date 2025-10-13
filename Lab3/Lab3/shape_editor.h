@@ -55,7 +55,6 @@ public:
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             
-            // Рисуем только в области ниже тулбара
             for (int i = 0; i < shapeCount; i++) {
                 if (pcshape[i]) {
                     pcshape[i]->Show(hdc);
@@ -66,7 +65,6 @@ public:
         }
     }
     
-    // ДОБАВЛЕНО: метод для синхронизации меню с выбранным инструментом
     void OnInitMenuPopup(HWND hWnd, WPARAM wParam) {
         HMENU hMenu = (HMENU)wParam;
         CheckMenuItem(hMenu, ID_POINT, currentType == POINT_EDITOR ? MF_CHECKED : MF_UNCHECKED);
@@ -77,14 +75,14 @@ public:
     
     LRESULT OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam) {
         LPNMHDR lpnmhdr = (LPNMHDR)lParam;
-        if (lpnmhdr->code == TTN_NEEDTEXT) {  // Изменено с TTN_GETDISPINFO на TTN_NEEDTEXT
+        if (lpnmhdr->code == TTN_NEEDTEXT) {
             LPTOOLTIPTEXT lpttt = (LPTOOLTIPTEXT)lParam;
             switch (lpttt->hdr.idFrom) {
-            case ID_POINT: lstrcpy(lpttt->szText, L"Крапка"); break;     // Изменено на lstrcpy
+            case ID_POINT: lstrcpy(lpttt->szText, L"Крапка"); break;
             case ID_LINE: lstrcpy(lpttt->szText, L"Лінія"); break;
             case ID_RECTANGLE: lstrcpy(lpttt->szText, L"Прямокутник"); break;
             case ID_ELLIPSE: lstrcpy(lpttt->szText, L"Еліпс"); break;
-            default: lstrcpy(lpttt->szText, L"Щось невідоме"); break;    // Добавлено default case
+            default: lstrcpy(lpttt->szText, L"Щось невідоме"); break;
             }
             return 0;
         }

@@ -40,7 +40,6 @@ public:
         }
         
         if (trail) {
-            // Устанавливаем красное перо для гумового следа
             HPEN hRedPen = CreatePen(PS_SOLID, 1, RGB(255, 0, 0));
             HPEN hOldPen = (HPEN)SelectObject(hdc, hRedPen);
             
