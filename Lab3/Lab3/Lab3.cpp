@@ -2,7 +2,6 @@
 #include "Lab3.h"
 #include "shape_editor.h"
 #include <commctrl.h>
-
 #pragma comment(lib, "Comctl32.lib")
 
 #define MAX_LOADSTRING 100
@@ -13,16 +12,10 @@ WCHAR szWindowClass[MAX_LOADSTRING];
 ShapeObjectsEditor editor;
 HWND hToolbar = NULL;
 
-int currentTool = 0;
-
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
-
-void UpdateWindowTitle(HWND hWnd);
-void OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam);
-void OnToolButton(HWND hWnd, int toolID);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -133,11 +126,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
        tbb[3].idCommand = ID_ELLIPSE;
        
        SendMessage(hToolbar, TB_ADDBUTTONS, 4, (LPARAM)&tbb);
-       
        SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
    }
 
-   UpdateWindowTitle(hWnd);
+   editor.UpdateWindowTitle(hWnd, szTitle);
 
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
@@ -145,92 +137,18 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
-void UpdateWindowTitle(HWND hWnd)
-{
-    WCHAR title[256];
-    WCHAR baseTitle[MAX_LOADSTRING];
-    LoadStringW(hInst, IDS_APP_TITLE, baseTitle, MAX_LOADSTRING);
-    
-    const WCHAR* shapeName = editor.GetCurrentShapeName();
-    wcscpy_s(title, shapeName);
-    wcscat_s(title, baseTitle);
-    
-    SetWindowTextW(hWnd, title);
-}
-
-void OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-    LPNMHDR pnmh = (LPNMHDR)lParam;
-    if (pnmh->code == TTN_NEEDTEXT)
-    {
-        LPTOOLTIPTEXT lpttt = (LPTOOLTIPTEXT)lParam;
-        switch (lpttt->hdr.idFrom)
-        {
-        case ID_POINT:
-            lstrcpy(lpttt->szText, L"Крапка");
-            break;
-        case ID_LINE:
-            lstrcpy(lpttt->szText, L"Лінія");
-            break;
-        case ID_RECTANGLE:
-            lstrcpy(lpttt->szText, L"Прямокутник");
-            break;
-        case ID_ELLIPSE:
-            lstrcpy(lpttt->szText, L"Еліпс");
-            break;
-        default:
-            lstrcpy(lpttt->szText, L"Щось невідоме");
-        }
-    }
-}
-
-void OnToolButton(HWND hWnd, int toolID)
-{
-    if (currentTool == toolID) {
-        SendMessage(hToolbar, TB_PRESSBUTTON, currentTool, FALSE);
-        currentTool = 0;
-        return;
-    }
-    
-    if (currentTool != 0) {
-        SendMessage(hToolbar, TB_PRESSBUTTON, currentTool, FALSE);
-    }
-    
-    currentTool = toolID;
-    SendMessage(hToolbar, TB_PRESSBUTTON, currentTool, TRUE);
-    
-    switch (toolID) {
-        case ID_POINT:
-            editor.StartPointEditor();
-            break;
-        case ID_LINE:
-            editor.StartLineEditor();
-            break;
-        case ID_RECTANGLE:
-            editor.StartRectEditor();
-            break;
-        case ID_ELLIPSE:
-            editor.StartEllipseEditor();
-            break;
-    }
-    
-    UpdateWindowTitle(hWnd);
-}
-
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-    case WM_SIZE: 
-        if (hToolbar) {
-            SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
-        }
+    case WM_SIZE:
+        editor.OnSize(hWnd, hToolbar);
         break;
     case WM_INITMENUPOPUP:
         editor.OnInitMenuPopup(hWnd, wParam);
         break;
-    case WM_NOTIFY: 
-        OnNotify(hWnd, wParam, lParam);
+    case WM_NOTIFY:
+        editor.OnNotify(hWnd, wParam, lParam);
         break;
     case WM_LBUTTONDOWN:
         editor.OnLBdown(hWnd);
@@ -253,7 +171,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case ID_LINE:
             case ID_RECTANGLE:
             case ID_ELLIPSE:
-                OnToolButton(hWnd, wmId);
+                editor.OnToolButton(hWnd, hToolbar, wmId);
+                editor.UpdateWindowTitle(hWnd, szTitle);
                 break;
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
