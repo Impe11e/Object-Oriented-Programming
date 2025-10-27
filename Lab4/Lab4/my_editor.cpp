@@ -1,6 +1,7 @@
 #include "my_editor.h"
 #include "Lab4.h"
 #include <string.h>
+#include <wchar.h>
 
 #pragma comment(lib, "Comctl32.lib")
 
@@ -51,14 +52,14 @@ void MyEditor::Start(Shape* prototype) {
         currentType = POINT_EDITOR;
     } else if (dynamic_cast<LineOOShape*>(prototype)) {
         currentType = LINEOO_EDITOR;
+    } else if (dynamic_cast<CubeShape*>(prototype)) {
+        currentType = CUBE_EDITOR;
     } else if (dynamic_cast<LineShape*>(prototype) && !dynamic_cast<LineOOShape*>(prototype)) {
         currentType = LINE_EDITOR;
     } else if (dynamic_cast<RectShape*>(prototype)) {
         currentType = RECT_EDITOR;
     } else if (dynamic_cast<EllipseShape*>(prototype)) {
         currentType = ELLIPSE_EDITOR;
-    } else if (dynamic_cast<CubeShape*>(prototype)) {
-        currentType = CUBE_EDITOR;
     } else {
         currentType = NO_EDITOR;
     }
@@ -85,7 +86,6 @@ void MyEditor::OnLBup(HWND hWnd) {
     EnsureCapacity();
     pcshape[shapeCount++] = currentShape;
 
-
     if (pcshape[shapeCount - 1])
         currentShape = pcshape[shapeCount - 1]->Clone();
     else
@@ -104,21 +104,22 @@ void MyEditor::OnMouseMove(HWND hWnd) {
     ScreenToClient(hWnd, &pt);
 
     HDC hdc = GetDC(hWnd);
+
+    HPEN hDashPen = CreatePen(PS_DASH, 1, RGB(255, 0, 0));
+    HPEN hOldPen = (HPEN)SelectObject(hdc, hDashPen);
+    HBRUSH hOldBrush = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
+
     int oldROP = SetROP2(hdc, R2_NOTXORPEN);
-    HPEN hPen = CreatePen(PS_DOT, 1, RGB(0, 0, 0));
-    HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
-    HBRUSH hBrushOld = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
 
     currentShape->Show(hdc);
 
     currentShape->Set(start.x, start.y, pt.x, pt.y);
-
     currentShape->Show(hdc);
 
-    SelectObject(hdc, hBrushOld);
-    SelectObject(hdc, hOldPen);
     SetROP2(hdc, oldROP);
-    DeleteObject(hPen);
+    SelectObject(hdc, hOldBrush);
+    SelectObject(hdc, hOldPen);
+    DeleteObject(hDashPen);
     ReleaseDC(hWnd, hdc);
 }
 
@@ -134,7 +135,7 @@ void MyEditor::OnPaint(HWND hWnd, HDC hdc) {
     FillRect(hdcMem, &rcClient, hbrBk);
     DeleteObject(hbrBk);
 
-    HPEN hPen = CreatePen(PS_SOLID, 1, RGB(255, 0, 0));
+    HPEN hPen = CreatePen(PS_SOLID, 1, RGB(0, 0, 0));
     HPEN hOldPen = (HPEN)SelectObject(hdcMem, hPen);
 
     for (int i = 0; i < shapeCount; ++i) {
@@ -152,49 +153,12 @@ void MyEditor::OnPaint(HWND hWnd, HDC hdc) {
     DeleteObject(hPen);
 }
 
-void MyEditor::OnToolbarCreate(HWND hWnd, HINSTANCE hInst) {
-    hwndToolBar = CreateWindowEx(
-        0, TOOLBARCLASSNAME, NULL,
-        WS_CHILD | WS_VISIBLE | WS_BORDER | WS_CLIPSIBLINGS |
-        CCS_TOP | TBSTYLE_TOOLTIPS,
-        0, 0, 0, 0,
-        hWnd,
-        (HMENU)1001,
-        hInst,
-        NULL
-    );
-
-    SendMessage(hwndToolBar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
-    SendMessage(hwndToolBar, TB_SETBITMAPSIZE, 0, MAKELPARAM(24, 24));
-    SendMessage(hwndToolBar, TB_SETBUTTONSIZE, 0, MAKELPARAM(24, 24));
-
-    TBADDBITMAP tbab;
-    tbab.hInst = hInst;
-    tbab.nID = IDB_TOOLBAR;
-    SendMessage(hwndToolBar, TB_ADDBITMAP, 6, (LPARAM)&tbab);
-
-    TBBUTTON tbb[6];
-    ZeroMemory(tbb, sizeof(tbb));
-    for (int i = 0; i < 6; ++i) {
-        tbb[i].iBitmap = i;
-        tbb[i].fsState = TBSTATE_ENABLED;
-        tbb[i].fsStyle = TBSTYLE_BUTTON;
-    }
-    tbb[0].idCommand = ID_POINT;
-    tbb[1].idCommand = ID_LINE;
-    tbb[2].idCommand = ID_RECTANGLE;
-    tbb[3].idCommand = ID_ELLIPSE;
-    tbb[4].idCommand = ID_LINEOO;
-    tbb[5].idCommand = ID_CUBE;
-
-    SendMessage(hwndToolBar, TB_ADDBUTTONS, 6, (LPARAM)&tbb);
-    SendMessage(hwndToolBar, TB_AUTOSIZE, 0, 0);
-    ShowWindow(hwndToolBar, TRUE);
+void MyEditor::AttachToolbar(HWND hwnd) {
+    hwndToolBar = hwnd;
 }
 
 void MyEditor::OnToolButtonClick(WPARAM wParam) {
     int buttonID = LOWORD(wParam);
-    // Сброс всех кнопок и установка выбранной
     const int ids[] = { ID_POINT, ID_LINE, ID_RECTANGLE, ID_ELLIPSE, ID_LINEOO, ID_CUBE };
     for (int i = 0; i < (int)(sizeof(ids)/sizeof(ids[0])); ++i) {
         SendMessage(hwndToolBar, TB_PRESSBUTTON, ids[i], MAKELONG(FALSE, 0));
@@ -208,18 +172,18 @@ void MyEditor::OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     if (pnmh->code == TTN_NEEDTEXT) {
         LPTOOLTIPTEXT lpttt = (LPTOOLTIPTEXT)lParam;
         switch (lpttt->hdr.idFrom) {
-        case ID_POINT: lstrcpy(lpttt->szText, L"Крапка"); break;
-        case ID_LINE: lstrcpy(lpttt->szText, L"Лінія"); break;
-        case ID_RECTANGLE: lstrcpy(lpttt->szText, L"Прямокутник"); break;
-        case ID_ELLIPSE: lstrcpy(lpttt->szText, L"Еліпс"); break;
-        case ID_LINEOO: lstrcpy(lpttt->szText, L"Лінія з кружечками"); break;
-        case ID_CUBE: lstrcpy(lpttt->szText, L"Куб"); break;
-        default: lstrcpy(lpttt->szText, L""); break;
+        case ID_POINT: wcscpy_s(lpttt->szText, _countof(lpttt->szText), L"Крапка"); break;
+        case ID_LINE: wcscpy_s(lpttt->szText, _countof(lpttt->szText), L"Лінія"); break;
+        case ID_RECTANGLE: wcscpy_s(lpttt->szText, _countof(lpttt->szText), L"Прямокутник"); break;
+        case ID_ELLIPSE: wcscpy_s(lpttt->szText, _countof(lpttt->szText), L"Еліпс"); break;
+        case ID_LINEOO: wcscpy_s(lpttt->szText, _countof(lpttt->szText), L"Лінія з кружечками"); break;
+        case ID_CUBE: wcscpy_s(lpttt->szText, _countof(lpttt->szText), L"Куб"); break;
+        default: wcscpy_s(lpttt->szText, _countof(lpttt->szText), L""); break;
         }
     }
 }
 
-void MyEditor::OnInitMenuPopup(HWND hWnd, WPARAM wParam) {
+void MyEditor::OnInitMenuPopup(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     HMENU hMenu = (HMENU)wParam;
     struct Item { int id; EditorType type; };
     const Item items[] = {

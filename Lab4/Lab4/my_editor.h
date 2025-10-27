@@ -44,10 +44,11 @@ public:
 
     void OnPaint(HWND hWnd, HDC hdc);
 
-    void OnToolbarCreate(HWND hWnd, HINSTANCE hInst);
+    void AttachToolbar(HWND hwnd);
+
     void OnToolButtonClick(WPARAM wParam);
     void OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam);
-    void OnInitMenuPopup(HWND hWnd, WPARAM wParam);
+    void OnInitMenuPopup(HWND hWnd, WPARAM wParam, LPARAM lParam = 0);
     void UpdateWindowTitle(HWND hWnd, LPCWSTR szTitle);
     void OnSize(HWND hWnd, HWND hwndToolBar);
 

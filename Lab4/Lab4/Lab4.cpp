@@ -89,6 +89,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     {
         // logger?
     }
+    else {
+        if (ped) ped->AttachToolbar(toolbar.GetHandle());
+    }
 
     if (ped) ped->UpdateWindowTitle(hWnd, szTitle);
 
