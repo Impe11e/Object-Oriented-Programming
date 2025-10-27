@@ -1,249 +1,250 @@
 #include "my_editor.h"
 #include "Lab4.h"
-#include <commctrl.h>
-#include <wchar.h>
+#include <string.h>
 
-ShapeObjectsEditor::ShapeObjectsEditor() : currentEditor(nullptr), currentType(NO_EDITOR) {
-    for (int i = 0; i < ARRAY_SIZE; i++) {
-        pcshape[i] = nullptr;
+#pragma comment(lib, "Comctl32.lib")
+
+void MyEditor::EnsureCapacity() {
+    if (!pcshape) {
+        capacity = INITIAL_CAPACITY;
+        pcshape = new Shape*[capacity];
+        memset(pcshape, 0, sizeof(Shape*) * capacity);
+        shapeCount = 0;
+        return;
     }
-    shapeCount = 0;
+    if (shapeCount < capacity) return;
+    int newCap = capacity * 2;
+    Shape** newArr = new Shape*[newCap];
+    memset(newArr, 0, sizeof(Shape*) * newCap);
+    for (int i = 0; i < shapeCount; ++i) newArr[i] = pcshape[i];
+    delete[] pcshape;
+    pcshape = newArr;
+    capacity = newCap;
 }
 
-ShapeObjectsEditor::~ShapeObjectsEditor() {
-    for (int i = 0; i < shapeCount; i++) {
-        delete pcshape[i];
+MyEditor::MyEditor()
+    : pcshape(nullptr),
+      shapeCount(0),
+      capacity(0),
+      currentShape(nullptr),
+      currentType(NO_EDITOR),
+      currentToolID(0),
+      hwndToolBar(nullptr)
+{
+}
+
+MyEditor::~MyEditor() {
+    if (pcshape) {
+        for (int i = 0; i < shapeCount; ++i) delete pcshape[i];
+        delete[] pcshape;
+        pcshape = nullptr;
     }
-    delete currentEditor;
+    delete currentShape;
+    currentShape = nullptr;
 }
 
-void PointEditor::OnLBdown(HWND hWnd) {
-    if (CheckArrayOverflow(hWnd)) return;
+void MyEditor::Start(Shape* prototype) {
+    if (!prototype) return;
+    EnsureCapacity();
 
-    POINT pt = GetMousePos(hWnd);
-    pcshape[*shapeCount] = new PointShape();
-    pcshape[*shapeCount]->Set(pt.x, pt.y, pt.x, pt.y);
-    (*shapeCount)++;
-    Invalidate(hWnd);
-}
-
-template<typename T>
-Editor* CreateEditor(Shape** shapes, int* count, int size) {
-    return new T(shapes, count, size);
-}
-
-struct EditorFactory {
-    EditorType type;
-    Editor* (*create)(Shape**, int*, int);
-};
-
-static const EditorFactory factories[] = {
-    {POINT_EDITOR, CreateEditor<PointEditor>},
-    {LINE_EDITOR, CreateEditor<LineEditor>},
-    {RECT_EDITOR, CreateEditor<RectEditor>},
-    {ELLIPSE_EDITOR, CreateEditor<EllipseEditor>},
-    {LINEOO_EDITOR, CreateEditor<LineOOEditor>},
-    {CUBE_EDITOR, CreateEditor<CubeEditor>}
-};
-
-void ShapeObjectsEditor::StartEditor(EditorType type) {
-    for (const auto& f : factories) {
-        if (f.type == type) {
-            delete currentEditor;
-            currentEditor = f.create(pcshape, &shapeCount, ARRAY_SIZE);
-            currentType = type;
-            return;
-        }
+    if (dynamic_cast<PointShape*>(prototype)) {
+        currentType = POINT_EDITOR;
+    } else if (dynamic_cast<LineOOShape*>(prototype)) {
+        currentType = LINEOO_EDITOR;
+    } else if (dynamic_cast<LineShape*>(prototype) && !dynamic_cast<LineOOShape*>(prototype)) {
+        currentType = LINE_EDITOR;
+    } else if (dynamic_cast<RectShape*>(prototype)) {
+        currentType = RECT_EDITOR;
+    } else if (dynamic_cast<EllipseShape*>(prototype)) {
+        currentType = ELLIPSE_EDITOR;
+    } else if (dynamic_cast<CubeShape*>(prototype)) {
+        currentType = CUBE_EDITOR;
+    } else {
+        currentType = NO_EDITOR;
     }
+
+    delete currentShape;
+    currentShape = prototype;
 }
 
-void ShapeObjectsEditor::StartPointEditor(HWND hWnd) {
-    StartEditor(POINT_EDITOR);
+void MyEditor::OnLBdown(HWND hWnd) {
+    if (!currentShape) return;
+    GetCursorPos(&start);
+    ScreenToClient(hWnd, &start);
+    currentShape->Set(start.x, start.y, start.x, start.y);
+    SetCapture(hWnd);
 }
 
-void ShapeObjectsEditor::StartLineEditor(HWND hWnd) {
-    StartEditor(LINE_EDITOR);
+void MyEditor::OnLBup(HWND hWnd) {
+    if (!currentShape) return;
+    POINT pt;
+    GetCursorPos(&pt);
+    ScreenToClient(hWnd, &pt);
+    currentShape->Set(start.x, start.y, pt.x, pt.y);
+
+    EnsureCapacity();
+    pcshape[shapeCount++] = currentShape;
+
+
+    if (pcshape[shapeCount - 1])
+        currentShape = pcshape[shapeCount - 1]->Clone();
+    else
+        currentShape = nullptr;
+
+    ReleaseCapture();
+    InvalidateRect(hWnd, NULL, FALSE);
 }
 
-void ShapeObjectsEditor::StartRectEditor(HWND hWnd) {
-    StartEditor(RECT_EDITOR);
+void MyEditor::OnMouseMove(HWND hWnd) {
+    if (!currentShape) return;
+    if ((GetKeyState(VK_LBUTTON) & 0x8000) == 0) return;
+
+    POINT pt;
+    GetCursorPos(&pt);
+    ScreenToClient(hWnd, &pt);
+
+    HDC hdc = GetDC(hWnd);
+    int oldROP = SetROP2(hdc, R2_NOTXORPEN);
+    HPEN hPen = CreatePen(PS_DOT, 1, RGB(0, 0, 0));
+    HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
+    HBRUSH hBrushOld = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
+
+    currentShape->Show(hdc);
+
+    currentShape->Set(start.x, start.y, pt.x, pt.y);
+
+    currentShape->Show(hdc);
+
+    SelectObject(hdc, hBrushOld);
+    SelectObject(hdc, hOldPen);
+    SetROP2(hdc, oldROP);
+    DeleteObject(hPen);
+    ReleaseDC(hWnd, hdc);
 }
 
-void ShapeObjectsEditor::StartEllipseEditor(HWND hWnd) {
-    StartEditor(ELLIPSE_EDITOR);
-}
-
-void ShapeObjectsEditor::StartLineOOEditor(HWND hWnd) {
-    StartEditor(LINEOO_EDITOR);
-}
-
-void ShapeObjectsEditor::StartCubeEditor(HWND hWnd) {
-    StartEditor(CUBE_EDITOR);
-}
-
-const WCHAR* ShapeObjectsEditor::GetCurrentShapeName() const {
-    static const WCHAR* names[] = {
-        L"", 
-        L"Крапка - ", 
-        L"Лінія - ", 
-        L"Прямокутник - ", 
-        L"Еліпс - ",
-        L"Лінія з кружечками - ",
-        L"Куб - "
-    };
-    return names[currentType];
-}
-
-void ShapeObjectsEditor::OnLBdown(HWND hWnd) {
-    if (currentEditor)
-        currentEditor->OnLBdown(hWnd);
-}
-
-void ShapeObjectsEditor::OnLBup(HWND hWnd) {
-    if (currentEditor) {
-        currentEditor->OnLBup(hWnd);
-        InvalidateRect(hWnd, NULL, FALSE);
-    }
-}
-
-void ShapeObjectsEditor::OnMouseMove(HWND hWnd) {
-    if (currentEditor)
-        currentEditor->OnMouseMove(hWnd);
-}
-
-void ShapeObjectsEditor::OnPaint(HWND hWnd) {
-    PAINTSTRUCT ps;
-    HDC hdc = BeginPaint(hWnd, &ps);
-    
+void MyEditor::OnPaint(HWND hWnd, HDC hdc) {
     RECT rcClient;
     GetClientRect(hWnd, &rcClient);
-    
+
     HDC hdcMem = CreateCompatibleDC(hdc);
     HBITMAP hbmMem = CreateCompatibleBitmap(hdc, rcClient.right, rcClient.bottom);
     HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hbmMem);
-    
-    HBRUSH hbrBkGnd = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
-    FillRect(hdcMem, &rcClient, hbrBkGnd);
-    DeleteObject(hbrBkGnd);
-    
-    HPEN hBlackPen = CreatePen(PS_SOLID, 1, RGB(0, 0, 0));
-    HPEN hOldPen = (HPEN)SelectObject(hdcMem, hBlackPen);
 
-    for (int i = 0; i < shapeCount; i++) {
-        if (pcshape[i]) {
-            pcshape[i]->Show(hdcMem);
-        }
+    HBRUSH hbrBk = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
+    FillRect(hdcMem, &rcClient, hbrBk);
+    DeleteObject(hbrBk);
+
+    HPEN hPen = CreatePen(PS_SOLID, 1, RGB(255, 0, 0));
+    HPEN hOldPen = (HPEN)SelectObject(hdcMem, hPen);
+
+    for (int i = 0; i < shapeCount; ++i) {
+        if (pcshape[i]) pcshape[i]->Show(hdcMem);
     }
 
-    SelectObject(hdcMem, hOldPen);
-    DeleteObject(hBlackPen);
-    
-    if (currentEditor) {
-        currentEditor->OnPaint(hdcMem);
-    }
-    
+    if (currentShape) currentShape->Show(hdcMem);
+
     BitBlt(hdc, 0, 0, rcClient.right, rcClient.bottom, hdcMem, 0, 0, SRCCOPY);
-    
+
     SelectObject(hdcMem, hbmOld);
     DeleteObject(hbmMem);
     DeleteDC(hdcMem);
-    
-    EndPaint(hWnd, &ps);
+    SelectObject(hdc, hOldPen);
+    DeleteObject(hPen);
 }
 
-void ShapeObjectsEditor::OnInitMenuPopup(HWND hWnd, WPARAM wParam) {
-    HMENU hMenu = (HMENU)wParam;
-    
-    struct MenuItemData {
-        int id;
-        EditorType type;
-    };
-    
-    static const MenuItemData menuItems[] = {
-        {ID_POINT, POINT_EDITOR},
-        {ID_LINE, LINE_EDITOR},
-        {ID_RECTANGLE, RECT_EDITOR},
-        {ID_ELLIPSE, ELLIPSE_EDITOR},
-        {ID_LINEOO, LINEOO_EDITOR},
-        {ID_CUBE, CUBE_EDITOR}
-    };
-    
-    for (const auto& item : menuItems) {
-        CheckMenuItem(hMenu, item.id, 
-            currentType == item.type ? MF_CHECKED : MF_UNCHECKED);
+void MyEditor::OnToolbarCreate(HWND hWnd, HINSTANCE hInst) {
+    hwndToolBar = CreateWindowEx(
+        0, TOOLBARCLASSNAME, NULL,
+        WS_CHILD | WS_VISIBLE | WS_BORDER | WS_CLIPSIBLINGS |
+        CCS_TOP | TBSTYLE_TOOLTIPS,
+        0, 0, 0, 0,
+        hWnd,
+        (HMENU)1001,
+        hInst,
+        NULL
+    );
+
+    SendMessage(hwndToolBar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+    SendMessage(hwndToolBar, TB_SETBITMAPSIZE, 0, MAKELPARAM(24, 24));
+    SendMessage(hwndToolBar, TB_SETBUTTONSIZE, 0, MAKELPARAM(24, 24));
+
+    TBADDBITMAP tbab;
+    tbab.hInst = hInst;
+    tbab.nID = IDB_TOOLBAR;
+    SendMessage(hwndToolBar, TB_ADDBITMAP, 6, (LPARAM)&tbab);
+
+    TBBUTTON tbb[6];
+    ZeroMemory(tbb, sizeof(tbb));
+    for (int i = 0; i < 6; ++i) {
+        tbb[i].iBitmap = i;
+        tbb[i].fsState = TBSTATE_ENABLED;
+        tbb[i].fsStyle = TBSTYLE_BUTTON;
     }
+    tbb[0].idCommand = ID_POINT;
+    tbb[1].idCommand = ID_LINE;
+    tbb[2].idCommand = ID_RECTANGLE;
+    tbb[3].idCommand = ID_ELLIPSE;
+    tbb[4].idCommand = ID_LINEOO;
+    tbb[5].idCommand = ID_CUBE;
+
+    SendMessage(hwndToolBar, TB_ADDBUTTONS, 6, (LPARAM)&tbb);
+    SendMessage(hwndToolBar, TB_AUTOSIZE, 0, 0);
+    ShowWindow(hwndToolBar, TRUE);
 }
 
-void ShapeObjectsEditor::OnToolButton(HWND hWnd, HWND hwndToolBar, int toolID) {
-    struct ButtonHandler {
-        int id;
-        void (ShapeObjectsEditor::*handler)(HWND);
-    };
-    
-    static const ButtonHandler handlers[] = {
-        {ID_POINT, &ShapeObjectsEditor::StartPointEditor},
-        {ID_LINE, &ShapeObjectsEditor::StartLineEditor},
-        {ID_RECTANGLE, &ShapeObjectsEditor::StartRectEditor},
-        {ID_ELLIPSE, &ShapeObjectsEditor::StartEllipseEditor},
-        {ID_LINEOO, &ShapeObjectsEditor::StartLineOOEditor},
-        {ID_CUBE, &ShapeObjectsEditor::StartCubeEditor}
-    };
-    
-    for (const auto& handler : handlers) {
-        if (toolID == handler.id) {
-            (this->*handler.handler)(hWnd);
-            break;
-        }
+void MyEditor::OnToolButtonClick(WPARAM wParam) {
+    int buttonID = LOWORD(wParam);
+    // Сброс всех кнопок и установка выбранной
+    const int ids[] = { ID_POINT, ID_LINE, ID_RECTANGLE, ID_ELLIPSE, ID_LINEOO, ID_CUBE };
+    for (int i = 0; i < (int)(sizeof(ids)/sizeof(ids[0])); ++i) {
+        SendMessage(hwndToolBar, TB_PRESSBUTTON, ids[i], MAKELONG(FALSE, 0));
     }
-    
-    static const int buttonIDs[] = {ID_POINT, ID_LINE, ID_RECTANGLE, ID_ELLIPSE, ID_LINEOO, ID_CUBE};
-    for (int id : buttonIDs) {
-        SendMessage(hwndToolBar, TB_PRESSBUTTON, id, MAKELONG(FALSE, 0));
-    }
-    
-    SendMessage(hwndToolBar, TB_PRESSBUTTON, toolID, MAKELONG(TRUE, 0));
+    SendMessage(hwndToolBar, TB_PRESSBUTTON, buttonID, MAKELONG(TRUE, 0));
 }
 
-void ShapeObjectsEditor::OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam) {
+void MyEditor::OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     LPNMHDR pnmh = (LPNMHDR)lParam;
-    if (pnmh->code != TTN_NEEDTEXT) return;
-    
-    LPTOOLTIPTEXT lpttt = (LPTOOLTIPTEXT)lParam;
-    
-    struct TooltipData {
-        int id;
-        const WCHAR* text;
-    };
-    
-    static const TooltipData tooltips[] = {
-        {ID_POINT, L"Крапка"},
-        {ID_LINE, L"Лінія"},
-        {ID_RECTANGLE, L"Прямокутник"},
-        {ID_ELLIPSE, L"Еліпс"},
-        {ID_LINEOO, L"Лінія з кружечками"},
-        {ID_CUBE, L"Куб"}
-    };
-    
-    for (const auto& tip : tooltips) {
-        if (lpttt->hdr.idFrom == tip.id) {
-            lstrcpy(lpttt->szText, tip.text);
-            break;
+    if (!pnmh) return;
+    if (pnmh->code == TTN_NEEDTEXT) {
+        LPTOOLTIPTEXT lpttt = (LPTOOLTIPTEXT)lParam;
+        switch (lpttt->hdr.idFrom) {
+        case ID_POINT: lstrcpy(lpttt->szText, L"Крапка"); break;
+        case ID_LINE: lstrcpy(lpttt->szText, L"Лінія"); break;
+        case ID_RECTANGLE: lstrcpy(lpttt->szText, L"Прямокутник"); break;
+        case ID_ELLIPSE: lstrcpy(lpttt->szText, L"Еліпс"); break;
+        case ID_LINEOO: lstrcpy(lpttt->szText, L"Лінія з кружечками"); break;
+        case ID_CUBE: lstrcpy(lpttt->szText, L"Куб"); break;
+        default: lstrcpy(lpttt->szText, L""); break;
         }
     }
 }
 
-void ShapeObjectsEditor::UpdateWindowTitle(HWND hWnd, LPCWSTR szBaseTitle) {
-    WCHAR title[256];
-    wcscpy_s(title, _countof(title), GetCurrentShapeName());
+void MyEditor::OnInitMenuPopup(HWND hWnd, WPARAM wParam) {
+    HMENU hMenu = (HMENU)wParam;
+    struct Item { int id; EditorType type; };
+    const Item items[] = {
+        { ID_POINT, POINT_EDITOR }, { ID_LINE, LINE_EDITOR }, { ID_RECTANGLE, RECT_EDITOR },
+        { ID_ELLIPSE, ELLIPSE_EDITOR }, { ID_LINEOO, LINEOO_EDITOR }, { ID_CUBE, CUBE_EDITOR }
+    };
+    for (const Item& it : items) {
+        UINT uCheck = (currentType == it.type) ? MF_CHECKED : MF_UNCHECKED;
+        CheckMenuItem(hMenu, it.id, MF_BYCOMMAND | uCheck);
+    }
+}
+
+void MyEditor::UpdateWindowTitle(HWND hWnd, LPCWSTR szBaseTitle) {
+    WCHAR title[256] = {0};
+    const WCHAR* names[] = { L"", L"Крапка - ", L"Лінія - ", L"Прямокутник - ", L"Еліпс - ", L"Лінія з кружечками - ", L"Куб - " };
+    const WCHAR* prefix = names[static_cast<int>(currentType)];
+    wcscpy_s(title, _countof(title), prefix);
     wcscat_s(title, _countof(title), szBaseTitle);
     SetWindowTextW(hWnd, title);
 }
 
-void ShapeObjectsEditor::OnSize(HWND hWnd, HWND hwndToolBar) {
-    if (!hwndToolBar) return;
-    
+void MyEditor::OnSize(HWND hWnd, HWND hwndToolBar_) {
+    if (!hwndToolBar_) return;
     RECT rc, rw;
     GetClientRect(hWnd, &rc);
-    GetWindowRect(hwndToolBar, &rw);
-    MoveWindow(hwndToolBar, 0, 0, rc.right - rc.left, rw.bottom - rw.top, FALSE);
+    GetWindowRect(hwndToolBar_, &rw);
+    MoveWindow(hwndToolBar_, 0, 0, rc.right - rc.left, rw.bottom - rw.top, FALSE);
 }

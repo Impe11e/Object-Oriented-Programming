@@ -1,4 +1,8 @@
 ﻿#include "shape.h"
+#include <algorithm>
+
+using std::min;
+using std::max;
 
 void Shape::Set(long x1, long y1, long x2, long y2)
 {
@@ -13,13 +17,11 @@ void PointShape::Show(HDC hdc)
 	SetPixel(hdc, xs1, ys1, RGB(0, 0, 0));
 }
 
-
 void LineShape::Show(HDC hdc)
 {
 	MoveToEx(hdc, xs1, ys1, NULL);
 	LineTo(hdc, xs2, ys2);
 }
-
 
 void RectShape::Show(HDC hdc)
 {
@@ -67,42 +69,72 @@ void LineOOShape::Show(HDC hdc)
 
 void CubeShape::Show(HDC hdc)
 {
-	long width = abs(xs2 - xs1);
-	long height = abs(ys2 - ys1);
-	long depth = min(width, height) / 3;
+	long left = min(xs1, xs2);
+	long right = max(xs1, xs2);
+	long top = min(ys1, ys2);
+	long bottom = max(ys1, ys2);
 	
-	long origX1 = xs1;
-	long origY1 = ys1;
-	long origX2 = xs2;
-	long origY2 = ys2;
+	long width = right - left;
+	long height = bottom - top;
 	
-	long frontX1 = xs1;
-	long frontY1 = ys1 + depth;
-	long frontX2 = xs2 - depth;
-	long frontY2 = ys2;
+	if (width <= 0 || height <= 0) return;
 	
-	long backX1 = xs1 + depth;
-	long backY1 = ys1;
-	long backX2 = xs2;
-	long backY2 = ys2 - depth;
+	long depth = max(4L, min(width, height) / 4);
 	
-	Shape::Set(backX1, backY1, backX2, backY2);
-	RectShape::Show(hdc);
+	long frontX1 = left;
+	long frontY1 = top + depth;
+	long frontX2 = right - depth;
+	long frontY2 = bottom;
 	
-	Shape::Set(frontX1, frontY1, frontX2, frontY2);
-	RectShape::Show(hdc);
+	long backX1 = left + depth;
+	long backY1 = top;
+	long backX2 = right;
+	long backY2 = bottom - depth;
 	
-	Shape::Set(frontX1, frontY1, backX1, backY1);
-	LineShape::Show(hdc);
+	HBRUSH hOldBrush = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
+	Rectangle(hdc, (int)backX1, (int)backY1, (int)backX2, (int)backY2);
+	Rectangle(hdc, (int)frontX1, (int)frontY1, (int)frontX2, (int)frontY2);
 	
-	Shape::Set(frontX2, frontY1, backX2, backY1);
-	LineShape::Show(hdc);
+	MoveToEx(hdc, (int)frontX1, (int)frontY1, NULL); LineTo(hdc, (int)backX1, (int)backY1);
+	MoveToEx(hdc, (int)frontX2, (int)frontY1, NULL); LineTo(hdc, (int)backX2, (int)backY1);
+	MoveToEx(hdc, (int)frontX2, (int)frontY2, NULL); LineTo(hdc, (int)backX2, (int)backY2);
+	MoveToEx(hdc, (int)frontX1, (int)frontY2, NULL); LineTo(hdc, (int)backX1, (int)backY2);
 	
-	Shape::Set(frontX2, frontY2, backX2, backY2);
-	LineShape::Show(hdc);
-	
-	Shape::Set(frontX1, frontY2, backX1, backY2);
-	LineShape::Show(hdc);
-	
-	Shape::Set(origX1, origY1, origX2, origY2);
+	SelectObject(hdc, hOldBrush);
+}
+
+Shape* PointShape::Clone() const {
+	PointShape* p = new PointShape();
+	p->Set(xs1, ys1, xs2, ys2);
+	return p;
+}
+
+Shape* LineShape::Clone() const {
+	LineShape* p = new LineShape();
+	p->Set(xs1, ys1, xs2, ys2);
+	return p;
+}
+
+Shape* RectShape::Clone() const {
+	RectShape* p = new RectShape();
+	p->Set(xs1, ys1, xs2, ys2);
+	return p;
+}
+
+Shape* EllipseShape::Clone() const {
+	EllipseShape* p = new EllipseShape();
+	p->Set(xs1, ys1, xs2, ys2);
+	return p;
+}
+
+Shape* LineOOShape::Clone() const {
+	LineOOShape* p = new LineOOShape();
+	p->Set(xs1, ys1, xs2, ys2);
+	return p;
+}
+
+Shape* CubeShape::Clone() const {
+	CubeShape* p = new CubeShape();
+	p->Set(xs1, ys1, xs2, ys2);
+	return p;
 }
