@@ -28,7 +28,7 @@ void PointEditor::OnLBdown(HWND hWnd) {
     pcshape[*shapeCount] = new PointShape();
     pcshape[*shapeCount]->Set(pt.x, pt.y, pt.x, pt.y);
     (*shapeCount)++;
-    Invalidate(hWnd);
+    InvalidateRect(hWnd, NULL, FALSE);
 }
 
 void PointEditor::OnLBup(HWND hWnd) {
@@ -59,7 +59,7 @@ void LineEditor::OnLBup(HWND hWnd) {
         (*shapeCount)++;
         trail = nullptr;
         ReleaseCapture();
-        Invalidate(hWnd);
+        InvalidateRect(hWnd, NULL, FALSE);
     }
 }
 
@@ -67,7 +67,7 @@ void LineEditor::OnMouseMove(HWND hWnd) {
     if (trail) {
         POINT pt = GetMousePos(hWnd);
         trail->Set(startPoint.x, startPoint.y, pt.x, pt.y);
-        Invalidate(hWnd);
+        InvalidateRect(hWnd, NULL, FALSE);
     }
 }
 
@@ -93,7 +93,7 @@ void RectEditor::OnLBup(HWND hWnd) {
         (*shapeCount)++;
         trail = nullptr;
         ReleaseCapture();
-        Invalidate(hWnd);
+        InvalidateRect(hWnd, NULL, FALSE);
     }
 }
 
@@ -106,7 +106,7 @@ void RectEditor::OnMouseMove(HWND hWnd) {
         
         trail->Set(startPoint.x - dx, startPoint.y - dy, 
                    startPoint.x + dx, startPoint.y + dy);
-        Invalidate(hWnd);
+        InvalidateRect(hWnd, NULL, FALSE);
     }
 }
 
@@ -132,7 +132,7 @@ void EllipseEditor::OnLBup(HWND hWnd) {
         (*shapeCount)++;
         trail = nullptr;
         ReleaseCapture();
-        Invalidate(hWnd);
+        InvalidateRect(hWnd, NULL, FALSE);
     }
 }
 
@@ -140,7 +140,7 @@ void EllipseEditor::OnMouseMove(HWND hWnd) {
     if (trail) {
         POINT pt = GetMousePos(hWnd);
         trail->Set(startPoint.x, startPoint.y, pt.x, pt.y);
-        Invalidate(hWnd);
+        InvalidateRect(hWnd, NULL, FALSE);
     }
 }
 
@@ -181,7 +181,7 @@ void ShapeObjectsEditor::OnLBdown(HWND hWnd) {
 void ShapeObjectsEditor::OnLBup(HWND hWnd) {
     if (currentEditor) {
         currentEditor->OnLBup(hWnd);
-        InvalidateRect(hWnd, NULL, TRUE);
+        InvalidateRect(hWnd, NULL, FALSE);
     }
 }
 
@@ -191,20 +191,44 @@ void ShapeObjectsEditor::OnMouseMove(HWND hWnd) {
 }
 
 void ShapeObjectsEditor::OnPaint(HWND hWnd) {
-    if (currentEditor) {
-        currentEditor->OnPaint(hWnd);
-    } else {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-        
-        for (int i = 0; i < shapeCount; i++) {
-            if (pcshape[i]) {
-                pcshape[i]->Show(hdc);
-            }
+    PAINTSTRUCT ps;
+    HDC hdc = BeginPaint(hWnd, &ps);
+    
+    // Получаем размеры клиентской области
+    RECT rcClient;
+    GetClientRect(hWnd, &rcClient);
+    
+    // Создаем буфер в памяти
+    HDC hdcMem = CreateCompatibleDC(hdc);
+    HBITMAP hbmMem = CreateCompatibleBitmap(hdc, rcClient.right, rcClient.bottom);
+    HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hbmMem);
+    
+    // Очищаем фон белым цветом
+    HBRUSH hbrBkGnd = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
+    FillRect(hdcMem, &rcClient, hbrBkGnd);
+    DeleteObject(hbrBkGnd);
+    
+    // Рисуем все сохраненные фигуры
+    for (int i = 0; i < shapeCount; i++) {
+        if (pcshape[i]) {
+            pcshape[i]->Show(hdcMem);
         }
-        
-        EndPaint(hWnd, &ps);
     }
+    
+    // Рисуем текущую фигуру (trail)
+    if (currentEditor) {
+        currentEditor->OnPaint(hdcMem);
+    }
+    
+    // Копируем из буфера на экран
+    BitBlt(hdc, 0, 0, rcClient.right, rcClient.bottom, hdcMem, 0, 0, SRCCOPY);
+    
+    // Освобождаем ресурсы
+    SelectObject(hdcMem, hbmOld);
+    DeleteObject(hbmMem);
+    DeleteDC(hdcMem);
+    
+    EndPaint(hWnd, &ps);
 }
 
 void ShapeObjectsEditor::OnInitMenuPopup(HWND hWnd, WPARAM wParam) {

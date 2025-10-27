@@ -29,16 +29,7 @@ public:
     virtual void OnLBup(HWND hWnd) = 0;
     virtual void OnMouseMove(HWND hWnd) = 0;
     
-    void OnPaint(HWND hWnd) {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
-        
-        for (int i = 0; i < *shapeCount; i++) {
-            if (pcshape[i]) {
-                pcshape[i]->Show(hdc);
-            }
-        }
-        
+    void OnPaint(HDC hdc) {
         if (trail) {
             HPEN hRedPen = CreatePen(PS_SOLID, 1, RGB(255, 0, 0));
             HPEN hOldPen = (HPEN)SelectObject(hdc, hRedPen);
@@ -48,8 +39,6 @@ public:
             SelectObject(hdc, hOldPen);
             DeleteObject(hRedPen);
         }
-        
-        EndPaint(hWnd, &ps);
     }
 };
 
