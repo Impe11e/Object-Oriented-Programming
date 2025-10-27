@@ -5,8 +5,8 @@
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
 //
-// Generated from the TEXTINCLUDE 2 resource.
-//
+ // Generated from the TEXTINCLUDE 2 resource.
+ //
 #ifndef APSTUDIO_INVOKED
 #include "targetver.h"
 #endif
@@ -59,6 +59,8 @@ BEGIN
         MENUITEM "Лінія",                       ID_LINE
         MENUITEM "Прямокутник",                 ID_RECTANGLE
         MENUITEM "Еліпс",                       ID_ELLIPSE
+        MENUITEM "Пряма з кружечками",         ID_LINEOO
+        MENUITEM "Куб",                       ID_CUBE
     END
     POPUP "&Довідка"
     BEGIN
