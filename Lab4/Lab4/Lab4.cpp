@@ -1,6 +1,7 @@
 ﻿#include "framework.h"
 #include "Lab4.h"
 #include "shape_editor.h"
+#include "toolbar.h"
 #include <commctrl.h>
 #pragma comment(lib, "Comctl32.lib")
 
@@ -10,7 +11,7 @@ HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING];
 WCHAR szWindowClass[MAX_LOADSTRING];
 ShapeObjectsEditor editor;
-HWND hToolbar = NULL;
+Toolbar toolbar;
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -83,50 +84,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 
-   hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
-       WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | CCS_TOP | TBSTYLE_TOOLTIPS | TBSTYLE_WRAPABLE,
-       0, 0, 0, 0,
-       hWnd, (HMENU)1000, hInstance, NULL);
-
-   if (hToolbar)
+   if (!toolbar.Create(hWnd, hInstance))
    {
-       SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
-       
-       HIMAGELIST hImageList = ImageList_Create(24, 24, ILC_COLOR32 | ILC_MASK, 4, 0);
-       HBITMAP hBitmap = LoadBitmap(hInstance, MAKEINTRESOURCE(IDB_TOOLBAR));
-       
-       if (hBitmap) {
-           ImageList_Add(hImageList, hBitmap, NULL);
-           DeleteObject(hBitmap);
-       }
-       
-       SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageList);
-       
-       TBBUTTON tbb[4];
-       ZeroMemory(tbb, sizeof(tbb));
-       
-       tbb[0].iBitmap = 0;
-       tbb[0].fsState = TBSTATE_ENABLED;
-       tbb[0].fsStyle = TBSTYLE_BUTTON;
-       tbb[0].idCommand = ID_POINT;
-       
-       tbb[1].iBitmap = 1;
-       tbb[1].fsState = TBSTATE_ENABLED;
-       tbb[1].fsStyle = TBSTYLE_BUTTON;
-       tbb[1].idCommand = ID_LINE;
-       
-       tbb[2].iBitmap = 2;
-       tbb[2].fsState = TBSTATE_ENABLED;
-       tbb[2].fsStyle = TBSTYLE_BUTTON;
-       tbb[2].idCommand = ID_RECTANGLE;
-       
-       tbb[3].iBitmap = 3;
-       tbb[3].fsState = TBSTATE_ENABLED;
-       tbb[3].fsStyle = TBSTYLE_BUTTON;
-       tbb[3].idCommand = ID_ELLIPSE;
-       
-       SendMessage(hToolbar, TB_ADDBUTTONS, 4, (LPARAM)&tbb);
-       SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
+
    }
 
    editor.UpdateWindowTitle(hWnd, szTitle);
@@ -142,8 +102,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
     case WM_SIZE:
-
-        editor.OnSize(hWnd, hToolbar);
+        editor.OnSize(hWnd, toolbar.GetHandle());
         break;
     case WM_INITMENUPOPUP:
         editor.OnInitMenuPopup(hWnd, wParam);
@@ -172,7 +131,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case ID_LINE:
             case ID_RECTANGLE:
             case ID_ELLIPSE:
-                editor.OnToolButton(hWnd, hToolbar, wmId);
+                editor.OnToolButton(hWnd, toolbar.GetHandle(), wmId);
                 editor.UpdateWindowTitle(hWnd, szTitle);
                 break;
             case IDM_ABOUT:

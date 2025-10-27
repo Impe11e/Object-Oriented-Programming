@@ -24,11 +24,11 @@
     <ClInclude Include="Resource.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="Lab2.h">
+    <ClInclude Include="Lab4.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="editor.h">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="shape.h">
       <Filter>Файлы заголовков</Filter>
@@ -36,9 +36,12 @@
     <ClInclude Include="shape_editor.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="toolbar.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Lab2.cpp">
+    <ClCompile Include="Lab4.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="shape_editor.cpp">
@@ -47,9 +50,12 @@
     <ClCompile Include="shape.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="toolbar.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Lab2.rc">
+    <ResourceCompile Include="Lab4.rc">
       <Filter>Файлы ресурсов</Filter>
     </ResourceCompile>
   </ItemGroup>
@@ -57,7 +63,7 @@
     <Image Include="small.ico">
       <Filter>Файлы ресурсов</Filter>
     </Image>
-    <Image Include="Lab2.ico">
+    <Image Include="Lab4.ico">
       <Filter>Файлы ресурсов</Filter>
     </Image>
   </ItemGroup>
