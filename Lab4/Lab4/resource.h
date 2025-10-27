@@ -14,6 +14,8 @@
 #define ID_LINE                         32776
 #define ID_RECTANGLE                    32777
 #define ID_ELLIPSE                      32778
+#define ID_LINEOO                       32779
+#define ID_CUBE                         32780
 #define IDC_STATIC                      -1
 
 #ifdef APSTUDIO_INVOKED

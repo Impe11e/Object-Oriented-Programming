@@ -39,7 +39,7 @@ void Toolbar::SetupImageList() {
         return;
     }
 
-    HIMAGELIST hImageList = ImageList_Create(24, 24, ILC_COLOR32 | ILC_MASK, 4, 0);
+    HIMAGELIST hImageList = ImageList_Create(24, 24, ILC_COLOR32 | ILC_MASK, 6, 0);
     
     HBITMAP hBitmap = LoadBitmap(hInstance, MAKEINTRESOURCE(IDB_TOOLBAR));
 
@@ -56,7 +56,7 @@ void Toolbar::AddButtons() {
         return;
     }
 
-    TBBUTTON tbb[4];
+    TBBUTTON tbb[6];
     ZeroMemory(tbb, sizeof(tbb));
 
     tbb[0].iBitmap = 0;
@@ -79,7 +79,17 @@ void Toolbar::AddButtons() {
     tbb[3].fsStyle = TBSTYLE_BUTTON;
     tbb[3].idCommand = ID_ELLIPSE;
 
-    SendMessage(hToolbar, TB_ADDBUTTONS, 4, (LPARAM)&tbb);
+    tbb[4].iBitmap = 4;
+    tbb[4].fsState = TBSTATE_ENABLED;
+    tbb[4].fsStyle = TBSTYLE_BUTTON;
+    tbb[4].idCommand = ID_LINEOO;
+
+    tbb[5].iBitmap = 5;
+    tbb[5].fsState = TBSTATE_ENABLED;
+    tbb[5].fsStyle = TBSTYLE_BUTTON;
+    tbb[5].idCommand = ID_CUBE;
+
+    SendMessage(hToolbar, TB_ADDBUTTONS, 6, (LPARAM)&tbb); 
 }
 
 void Toolbar::AutoSize() {

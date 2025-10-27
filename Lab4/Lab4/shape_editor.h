@@ -4,7 +4,15 @@
 
 #define ARRAY_SIZE 129
 
-enum EditorType { NO_EDITOR, POINT_EDITOR, LINE_EDITOR, RECT_EDITOR, ELLIPSE_EDITOR };
+enum EditorType { 
+    NO_EDITOR, 
+    POINT_EDITOR, 
+    LINE_EDITOR, 
+    RECT_EDITOR, 
+    ELLIPSE_EDITOR,
+    LINEOO_EDITOR,
+    CUBE_EDITOR,
+};
 
 class ShapeObjectsEditor {
 private:
@@ -21,6 +29,8 @@ public:
     void StartLineEditor(HWND hWnd);
     void StartRectEditor(HWND hWnd);
     void StartEllipseEditor(HWND hWnd);
+    void StartLineOOEditor(HWND hWnd);
+    void StartCubeEditor(HWND hWnd);
 
     const WCHAR* GetCurrentShapeName() const;
 

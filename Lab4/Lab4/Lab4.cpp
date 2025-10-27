@@ -131,6 +131,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case ID_LINE:
             case ID_RECTANGLE:
             case ID_ELLIPSE:
+            case ID_LINEOO:
+            case ID_CUBE:
                 editor.OnToolButton(hWnd, toolbar.GetHandle(), wmId);
                 editor.UpdateWindowTitle(hWnd, szTitle);
                 break;
