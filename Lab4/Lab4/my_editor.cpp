@@ -1,7 +1,7 @@
-ï»¿#include "shape_editor.h"
-#include "shape.h"
+#include "my_editor.h"
 #include "Lab4.h"
 #include <commctrl.h>
+#include <wchar.h>
 
 ShapeObjectsEditor::ShapeObjectsEditor() : currentEditor(nullptr), currentType(NO_EDITOR) {
     for (int i = 0; i < ARRAY_SIZE; i++) {
@@ -84,12 +84,12 @@ void ShapeObjectsEditor::StartCubeEditor(HWND hWnd) {
 const WCHAR* ShapeObjectsEditor::GetCurrentShapeName() const {
     static const WCHAR* names[] = {
         L"", 
-        L"ÐšÑ€Ð°Ð¿ÐºÐ° - ", 
-        L"Ð›Ñ–Ð½Ñ–Ñ - ", 
-        L"ÐŸÑ€ÑÐ¼Ð¾ÐºÑƒÑ‚Ð½Ð¸Ðº - ", 
-        L"Ð•Ð»Ñ–Ð¿Ñ - ",
-        L"Ð›Ñ–Ð½Ñ–Ñ Ð· ÐºÑ€ÑƒÐ¶ÐµÑ‡ÐºÐ°Ð¼Ð¸ - ",
-        L"ÐšÑƒÐ± - "
+        L"Êðàïêà - ", 
+        L"Ë³í³ÿ - ", 
+        L"Ïðÿìîêóòíèê - ", 
+        L"Åë³ïñ - ",
+        L"Ë³í³ÿ ç êðóæå÷êàìè - ",
+        L"Êóá - "
     };
     return names[currentType];
 }
@@ -216,12 +216,12 @@ void ShapeObjectsEditor::OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam) {
     };
     
     static const TooltipData tooltips[] = {
-        {ID_POINT, L"ÐšÑ€Ð°Ð¿ÐºÐ°"},
-        {ID_LINE, L"Ð›Ñ–Ð½Ñ–Ñ"},
-        {ID_RECTANGLE, L"ÐŸÑ€ÑÐ¼Ð¾ÐºÑƒÑ‚Ð½Ð¸Ðº"},
-        {ID_ELLIPSE, L"Ð•Ð»Ñ–Ð¿Ñ"},
-        {ID_LINEOO, L"Ð›Ñ–Ð½Ñ–Ñ Ð· ÐºÑ€ÑƒÐ¶ÐµÑ‡ÐºÐ°Ð¼Ð¸"},
-        {ID_CUBE, L"ÐšÑƒÐ±"}
+        {ID_POINT, L"Êðàïêà"},
+        {ID_LINE, L"Ë³í³ÿ"},
+        {ID_RECTANGLE, L"Ïðÿìîêóòíèê"},
+        {ID_ELLIPSE, L"Åë³ïñ"},
+        {ID_LINEOO, L"Ë³í³ÿ ç êðóæå÷êàìè"},
+        {ID_CUBE, L"Êóá"}
     };
     
     for (const auto& tip : tooltips) {
@@ -234,8 +234,8 @@ void ShapeObjectsEditor::OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam) {
 
 void ShapeObjectsEditor::UpdateWindowTitle(HWND hWnd, LPCWSTR szBaseTitle) {
     WCHAR title[256];
-    wcscpy_s(title, GetCurrentShapeName());
-    wcscat_s(title, szBaseTitle);
+    wcscpy_s(title, _countof(title), GetCurrentShapeName());
+    wcscat_s(title, _countof(title), szBaseTitle);
     SetWindowTextW(hWnd, title);
 }
 

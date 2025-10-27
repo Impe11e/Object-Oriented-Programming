@@ -123,7 +123,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="editor.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Lab4.h" />
     <ClInclude Include="Resource.h" />
@@ -131,12 +130,14 @@
     <ClInclude Include="shape_editor.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="toolbar.h" />
+    <ClInclude Include="my_editor.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lab4.cpp" />
     <ClCompile Include="shape.cpp" />
     <ClCompile Include="shape_editor.cpp" />
     <ClCompile Include="toolbar.cpp" />
+    <ClCompile Include="my_editor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Lab4.rc" />

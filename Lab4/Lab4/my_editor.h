@@ -1,6 +1,21 @@
-п»ї#pragma once
+#pragma once
+
 #include <windows.h>
+#include <commctrl.h>
 #include "shape.h"
+#include "resource.h"
+
+#define ARRAY_SIZE 129
+
+enum EditorType { 
+    NO_EDITOR, 
+    POINT_EDITOR, 
+    LINE_EDITOR, 
+    RECT_EDITOR, 
+    ELLIPSE_EDITOR,
+    LINEOO_EDITOR,
+    CUBE_EDITOR,
+};
 
 class Editor {
 protected:
@@ -21,7 +36,7 @@ protected:
     
     bool CheckArrayOverflow(HWND hWnd) {
         if (*shapeCount >= arraySize) {
-            MessageBox(hWnd, L"РњР°СЃРёРІ Р·Р°РїРѕРІРЅРµРЅРёР№!", L"РџРѕРїРµСЂРµРґР¶РµРЅРЅСЏ", MB_OK);
+            MessageBox(hWnd, L"Масив заповнений!", L"Попередження", MB_OK);
             return true;
         }
         return false;
@@ -164,4 +179,38 @@ protected:
 public:
     CubeEditor(Shape** shapeArray, int* count, int size) 
         : TwoPointEditor(shapeArray, count, size) {}
+};
+
+class ShapeObjectsEditor {
+private:
+    Shape* pcshape[ARRAY_SIZE];
+    int shapeCount;
+    Editor* currentEditor;
+    EditorType currentType;
+    
+    void StartEditor(EditorType type);
+    
+public:
+    ShapeObjectsEditor();
+    ~ShapeObjectsEditor();
+
+    void StartPointEditor(HWND hWnd);
+    void StartLineEditor(HWND hWnd);
+    void StartRectEditor(HWND hWnd);
+    void StartEllipseEditor(HWND hWnd);
+    void StartLineOOEditor(HWND hWnd);
+    void StartCubeEditor(HWND hWnd);
+
+    const WCHAR* GetCurrentShapeName() const;
+
+    void OnLBdown(HWND hWnd);
+    void OnLBup(HWND hWnd);
+    void OnMouseMove(HWND hWnd);
+    void OnPaint(HWND hWnd);
+    void OnInitMenuPopup(HWND hWnd, WPARAM wParam);
+    void OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam);
+    
+    void UpdateWindowTitle(HWND hWnd, LPCWSTR szTitle);
+    void OnToolButton(HWND hWnd, HWND hwndToolBar, int toolID);
+    void OnSize(HWND hWnd, HWND hwndToolBar);
 };

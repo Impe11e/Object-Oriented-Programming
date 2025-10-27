@@ -1,6 +1,6 @@
 ﻿#include "framework.h"
 #include "Lab4.h"
-#include "shape_editor.h"
+#include "my_editor.h"
 #include "toolbar.h"
 #include <commctrl.h>
 #pragma comment(lib, "Comctl32.lib")
