@@ -1,4 +1,5 @@
 ﻿#include "shape_editor.h"
+#include "shape.h"
 #include "Lab4.h"
 #include <commctrl.h>
 
@@ -246,17 +247,3 @@ void ShapeObjectsEditor::OnSize(HWND hWnd, HWND hwndToolBar) {
     GetWindowRect(hwndToolBar, &rw);
     MoveWindow(hwndToolBar, 0, 0, rc.right - rc.left, rw.bottom - rw.top, FALSE);
 }
-
-class Shape {
-public:
-    virtual Shape* Clone() const = 0; 
-};
-
-class LineShape : public virtual Shape {
-public:
-    Shape* Clone() const override {
-        LineShape* copy = new LineShape();
-        copy->Set(xs1, ys1, xs2, ys2);
-        return copy;
-    }
-};

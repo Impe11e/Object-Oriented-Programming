@@ -21,6 +21,8 @@ private:
     Editor* currentEditor;
     EditorType currentType;
     
+    void StartEditor(EditorType type);
+    
 public:
     ShapeObjectsEditor();
     ~ShapeObjectsEditor();
