@@ -3,6 +3,7 @@
 #include "my_editor.h"
 #include "toolbar.h"
 #include <commctrl.h>
+#include <functional>
 #pragma comment(lib, "Comctl32.lib")
 
 #define MAX_LOADSTRING 100
@@ -143,50 +144,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
+
+        static const std::pair<int, std::function<Shape*()>> shapeCommands[] = {
+            { ID_POINT,   []() -> Shape* { return new PointShape(); } },
+            { ID_LINE,    []() -> Shape* { return new LineShape(); } },
+            { ID_RECTANGLE,[]() -> Shape* { return new RectShape(); } },
+            { ID_ELLIPSE, []() -> Shape* { return new EllipseShape(); } },
+            { ID_LINEOO,  []() -> Shape* { return new LineOOShape(); } },
+            { ID_CUBE,    []() -> Shape* { return new CubeShape(); } }
+        };
+
+        bool handled = false;
+        for (const auto& entry : shapeCommands) {
+            if (wmId == entry.first) {
+                if (!ped) ped = new MyEditor();
+                ped->AttachToolbar(toolbar.GetHandle());
+                ped->Start(entry.second());
+                ped->OnToolButtonClick(wParam);
+                ped->UpdateWindowTitle(hWnd, szTitle);
+                handled = true;
+                break;
+            }
+        }
+        if (handled) break;
+
         switch (wmId)
         {
-        case ID_POINT:
-            if (!ped) ped = new MyEditor();
-            ped->Start(new PointShape());
-            ped->OnToolButtonClick(wParam);
-            ped->UpdateWindowTitle(hWnd, szTitle);
-            break;
-
-        case ID_LINE:
-            if (!ped) ped = new MyEditor();
-            ped->Start(new LineShape());
-            ped->OnToolButtonClick(wParam);
-            ped->UpdateWindowTitle(hWnd, szTitle);
-            break;
-
-        case ID_RECTANGLE:
-            if (!ped) ped = new MyEditor();
-            ped->Start(new RectShape());
-            ped->OnToolButtonClick(wParam);
-            ped->UpdateWindowTitle(hWnd, szTitle);
-            break;
-
-        case ID_ELLIPSE:
-            if (!ped) ped = new MyEditor();
-            ped->Start(new EllipseShape());
-            ped->OnToolButtonClick(wParam);
-            ped->UpdateWindowTitle(hWnd, szTitle);
-            break;
-
-        case ID_LINEOO:
-            if (!ped) ped = new MyEditor();
-            ped->Start(new LineOOShape());
-            ped->OnToolButtonClick(wParam);
-            ped->UpdateWindowTitle(hWnd, szTitle);
-            break;
-
-        case ID_CUBE:
-            if (!ped) ped = new MyEditor();
-            ped->Start(new CubeShape());
-            ped->OnToolButtonClick(wParam);
-            ped->UpdateWindowTitle(hWnd, szTitle);
-            break;
-
         case IDM_ABOUT:
             DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
             break;

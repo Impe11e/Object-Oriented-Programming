@@ -29,7 +29,6 @@ MyEditor::MyEditor()
       capacity(0),
       currentShape(nullptr),
       currentType(NO_EDITOR),
-      currentToolID(0),
       hwndToolBar(nullptr)
 {
 }

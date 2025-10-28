@@ -25,9 +25,7 @@ private:
 
     Shape* currentShape; 
     EditorType currentType; 
-    int currentToolID;   
     POINT start;         
-    POINT end;           
     HWND hwndToolBar;    
 
     void EnsureCapacity();
