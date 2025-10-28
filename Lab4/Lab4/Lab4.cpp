@@ -1,8 +1,9 @@
 ﻿#include "framework.h"
 #include "Lab4.h"
-#include "shape_editor.h"
+#include "my_editor.h"
 #include "toolbar.h"
 #include <commctrl.h>
+#include <functional>
 #pragma comment(lib, "Comctl32.lib")
 
 #define MAX_LOADSTRING 100
@@ -10,7 +11,8 @@
 HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING];
 WCHAR szWindowClass[MAX_LOADSTRING];
-ShapeObjectsEditor editor;
+
+MyEditor* ped = nullptr;
 Toolbar toolbar;
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -19,9 +21,9 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR    lpCmdLine,
+    _In_ int       nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
@@ -32,7 +34,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     LoadStringW(hInstance, IDC_LAB4, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
-    if (!InitInstance (hInstance, nCmdShow))
+    if (!InitInstance(hInstance, nCmdShow))
     {
         return FALSE;
     }
@@ -49,7 +51,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
     }
 
-    return (int) msg.wParam;
+    return (int)msg.wParam;
 }
 
 ATOM MyRegisterClass(HINSTANCE hInstance)
@@ -64,7 +66,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hInstance = hInstance;
     wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_LAB4));
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_LAB4);
     wcex.lpszClassName = szWindowClass;
     wcex.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SMALL));
@@ -74,27 +76,30 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance;
+    hInst = hInstance;
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+    if (!hWnd)
+    {
+        return FALSE;
+    }
 
-   if (!toolbar.Create(hWnd, hInstance))
-   {
+    if (!toolbar.Create(hWnd, hInstance))
+    {
+        // logger?
+    }
+    else {
+        if (ped) ped->AttachToolbar(toolbar.GetHandle());
+    }
 
-   }
+    if (ped) ped->UpdateWindowTitle(hWnd, szTitle);
 
-   editor.UpdateWindowTitle(hWnd, szTitle);
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
-
-   return TRUE;
+    return TRUE;
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -102,54 +107,89 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
     case WM_SIZE:
-        editor.OnSize(hWnd, toolbar.GetHandle());
+        if (ped) ped->OnSize(hWnd, toolbar.GetHandle());
         break;
+
     case WM_INITMENUPOPUP:
-        editor.OnInitMenuPopup(hWnd, wParam);
+        if (ped) ped->OnInitMenuPopup(hWnd, wParam);
         break;
+
     case WM_NOTIFY:
-        editor.OnNotify(hWnd, wParam, lParam);
+        if (ped) ped->OnNotify(hWnd, wParam, lParam);
         break;
+
     case WM_LBUTTONDOWN:
-        editor.OnLBdown(hWnd);
+        if (ped) ped->OnLBdown(hWnd);
         break;
+
     case WM_LBUTTONUP:
-        editor.OnLBup(hWnd);
+        if (ped) ped->OnLBup(hWnd);
         break;
+
     case WM_MOUSEMOVE:
-        editor.OnMouseMove(hWnd);
+        if (ped) ped->OnMouseMove(hWnd);
         break;
+
     case WM_PAINT:
-        editor.OnPaint(hWnd);
-        break;
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        if (ped) {
+            ped->OnPaint(hWnd, hdc);
+        }
+        EndPaint(hWnd, &ps);
+    }
+    break;
+
     case WM_COMMAND:
-        {
-            int wmId = LOWORD(wParam);
-            switch (wmId)
-            {
-            case ID_POINT:
-            case ID_LINE:
-            case ID_RECTANGLE:
-            case ID_ELLIPSE:
-            case ID_LINEOO:
-            case ID_CUBE:
-                editor.OnToolButton(hWnd, toolbar.GetHandle(), wmId);
-                editor.UpdateWindowTitle(hWnd, szTitle);
+    {
+        int wmId = LOWORD(wParam);
+
+        static const std::pair<int, std::function<Shape*()>> shapeCommands[] = {
+            { ID_POINT,   []() -> Shape* { return new PointShape(); } },
+            { ID_LINE,    []() -> Shape* { return new LineShape(); } },
+            { ID_RECTANGLE,[]() -> Shape* { return new RectShape(); } },
+            { ID_ELLIPSE, []() -> Shape* { return new EllipseShape(); } },
+            { ID_LINEOO,  []() -> Shape* { return new LineOOShape(); } },
+            { ID_CUBE,    []() -> Shape* { return new CubeShape(); } }
+        };
+
+        bool handled = false;
+        for (const auto& entry : shapeCommands) {
+            if (wmId == entry.first) {
+                if (!ped) ped = new MyEditor();
+                ped->AttachToolbar(toolbar.GetHandle());
+                ped->Start(entry.second());
+                ped->OnToolButtonClick(wParam);
+                ped->UpdateWindowTitle(hWnd, szTitle);
+                handled = true;
                 break;
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
             }
         }
-        break;
+        if (handled) break;
+
+        switch (wmId)
+        {
+        case IDM_ABOUT:
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+            break;
+
+        case IDM_EXIT:
+            DestroyWindow(hWnd);
+            break;
+
+        default:
+            return DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    }
+    break;
+
     case WM_DESTROY:
+        delete ped;
+        ped = nullptr;
         PostQuitMessage(0);
         break;
+
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
