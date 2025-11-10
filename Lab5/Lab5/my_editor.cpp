@@ -1,6 +1,12 @@
 ﻿#include "my_editor.h"
 #include "Lab5.h"
 #include "my_table.h"
+#include "point.h"
+#include "line.h"
+#include "rectangle.h"
+#include "ellipse.h"
+#include "linewithcircles.h"
+#include "cube.h"
 #include <string.h>
 #include <wchar.h>
 

@@ -3,6 +3,12 @@
 #include "my_editor.h"
 #include "my_table.h"
 #include "toolbar.h"
+#include "point.h"
+#include "line.h"
+#include "rectangle.h"
+#include "ellipse.h"
+#include "linewithcircles.h"
+#include "cube.h"
 #include <commctrl.h>
 #include <functional>
 #pragma comment(lib, "Comctl32.lib")
