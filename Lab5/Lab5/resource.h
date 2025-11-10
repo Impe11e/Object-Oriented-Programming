@@ -19,13 +19,15 @@
 #define ID_ELLIPSE                      32778
 #define ID_LINEOO                       32779
 #define ID_CUBE                         32780
+#define IDM_LOAD                        32781
+#define IDM_SAVEAS                      32782
 #define IDC_STATIC                      -1
 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        134
-#define _APS_NEXT_COMMAND_VALUE         32781
+#define _APS_NEXT_COMMAND_VALUE         32783
 #define _APS_NEXT_CONTROL_VALUE         1002
 #define _APS_NEXT_SYMED_VALUE           111
 #endif

@@ -38,4 +38,5 @@ public:
     static void SetRemoveCallback(RemoveCallback cb);
 
     static void Remove(int index);
+    static void Clear();
 };

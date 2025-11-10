@@ -310,3 +310,88 @@ void MyEditor::OnTableRemove(int index) {
 
     if (mainHwnd) InvalidateRect(mainHwnd, NULL, FALSE);
 }
+
+void MyEditor::LoadFromFile(const char* filename, bool replace) {
+    if (!filename) return;
+    FILE* f = nullptr;
+    if (fopen_s(&f, filename, "rt") != 0 || !f) return;
+
+    if (replace) {
+        if (pcshape) {
+            for (int i = 0; i < shapeCount; ++i) delete pcshape[i];
+            delete[] pcshape;
+            pcshape = nullptr;
+        }
+        shapeCount = 0;
+        capacity = 0;
+        MyTable::Clear();
+    }
+
+    int loaded = 0;
+    char buf[512];
+    while (fgets(buf, sizeof(buf), f)) {
+        size_t len = strlen(buf);
+        while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r')) { buf[len-1] = '\0'; --len; }
+        if (len == 0) continue;
+
+        char* saveptr = nullptr;
+        char* token = strtok_s(buf, "\t", &saveptr);
+        if (!token) continue;
+        char name[128];
+        strncpy_s(name, token, _TRUNCATE);
+
+        if (_stricmp(name, "Назва") == 0 || _stricmp(name, "Name") == 0) continue;
+
+        token = strtok_s(nullptr, "\t", &saveptr);
+        if (!token) continue; char* endptr = nullptr; long x1 = strtol(token, &endptr, 10); if (*endptr != '\0') continue;
+        token = strtok_s(nullptr, "\t", &saveptr);
+        if (!token) continue; long y1 = strtol(token, &endptr, 10); if (*endptr != '\0') continue;
+        token = strtok_s(nullptr, "\t", &saveptr);
+        if (!token) continue; long x2 = strtol(token, &endptr, 10); if (*endptr != '\0') continue;
+        token = strtok_s(nullptr, "\t", &saveptr);
+        if (!token) continue; long y2 = strtol(token, &endptr, 10); if (*endptr != '\0') continue;
+
+        wchar_t wname[256] = {0};
+        int rc = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, name, -1, wname, _countof(wname));
+        if (rc == 0) {
+            MultiByteToWideChar(CP_ACP, 0, name, -1, wname, _countof(wname));
+        }
+
+        Shape* s = nullptr;
+        if (_stricmp(name, "Point") == 0 || _wcsicmp(wname, L"Точка") == 0) s = new PointShape();
+        else if (_stricmp(name, "Line") == 0 || _wcsicmp(wname, L"Лінія") == 0 || _wcsicmp(wname, L"Линия") == 0) s = new LineShape();
+        else if (_stricmp(name, "Rectangle") == 0 || _wcsicmp(wname, L"Прямокутник") == 0) s = new RectShape();
+        else if (_stricmp(name, "Ellipse") == 0 || _wcsicmp(wname, L"Еліпс") == 0 || _wcsicmp(wname, L"Эллипс") == 0) s = new EllipseShape();
+        else if (_stricmp(name, "LineOO") == 0 || _stricmp(name, "Line with circles") == 0 || _wcsicmp(wname, L"Лінія з кружечками") == 0 || _wcsicmp(wname, L"Линия с кружочками") == 0) s = new LineOOShape();
+        else if (_stricmp(name, "Cube") == 0 || _wcsicmp(wname, L"Куб") == 0) s = new CubeShape();
+
+        if (s) {
+            s->Set(x1, y1, x2, y2);
+            EnsureCapacity();
+            pcshape[shapeCount++] = s;
+            MyTable::Add(s->GetName(), x1, y1, x2, y2);
+            ++loaded;
+        }
+    }
+    fclose(f);
+
+    if (mainHwnd) {
+        InvalidateRect(mainHwnd, NULL, FALSE);
+    }
+}
+
+void MyEditor::SaveToFile(const char* filename) {
+    if (!filename) return;
+    FILE* f = nullptr;
+    if (fopen_s(&f, filename, "wt") != 0 || !f) return;
+
+    for (int i = 0; i < shapeCount; ++i) {
+        if (!pcshape[i]) continue;
+        const char* name = pcshape[i]->GetName();
+        long x1, y1, x2, y2;
+        pcshape[i]->Get(x1, y1, x2, y2);
+        fprintf(f, "%s\t%ld\t%ld\t%ld\t%ld\n", name, x1, y1, x2, y2);
+    }
+
+    fclose(f);
+}
