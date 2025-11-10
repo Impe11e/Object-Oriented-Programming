@@ -1,18 +1,93 @@
 ﻿#include "my_table.h"
 #include <stdio.h>
 #include <string.h>
+#include <windowsx.h>
 
 HWND MyTable::hWndTable = nullptr;
 HWND MyTable::hWndListView = nullptr;
 HINSTANCE MyTable::hInstTable = nullptr;
 std::vector<TableRow> MyTable::rows;
 
+static MyTable::HoverCallback g_hoverCb = nullptr;
+static MyTable::RemoveCallback g_removeCb = nullptr;
+
+static WNDPROC g_oldListProc = nullptr;
+static int g_lastHover = -1;
+static bool g_listTracking = false;
+
+void MyTable::SetHoverCallback(HoverCallback cb) {
+    g_hoverCb = cb;
+}
+
+void MyTable::SetRemoveCallback(RemoveCallback cb) {
+    g_removeCb = cb;
+}
+
+static LRESULT CALLBACK ListViewSubclass(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_MOUSEMOVE: {
+        POINT pt;
+        pt.x = GET_X_LPARAM(lParam);
+        pt.y = GET_Y_LPARAM(lParam);
+
+        LVHITTESTINFO ht = {};
+        ht.pt = pt;
+        int idx = ListView_HitTest(hwnd, &ht);
+
+        if (idx != g_lastHover) {
+            if (g_lastHover != -1) {
+                ListView_SetItemState(hwnd, g_lastHover, 0, LVIS_SELECTED | LVIS_FOCUSED);
+            }
+
+            g_lastHover = idx;
+
+            if (g_lastHover != -1) {
+                ListView_SetItemState(hwnd, g_lastHover, LVIS_SELECTED, LVIS_SELECTED);
+            }
+
+            if (g_hoverCb) g_hoverCb(idx);
+        }
+
+        if (!g_listTracking) {
+            TRACKMOUSEEVENT tme = { sizeof(tme) };
+            tme.dwFlags = TME_LEAVE;
+            tme.hwndTrack = hwnd;
+            TrackMouseEvent(&tme);
+            g_listTracking = true;
+        }
+        break;
+    }
+    case WM_MOUSELEAVE: {
+        if (g_lastHover != -1) {
+            ListView_SetItemState(hwnd, g_lastHover, 0, LVIS_SELECTED | LVIS_FOCUSED);
+            g_lastHover = -1;
+            if (g_hoverCb) g_hoverCb(-1);
+        }
+        g_listTracking = false;
+        break;
+    }
+    case WM_LBUTTONDOWN: {
+        POINT pt;
+        pt.x = GET_X_LPARAM(lParam);
+        pt.y = GET_Y_LPARAM(lParam);
+        LVHITTESTINFO ht = {};
+        ht.pt = pt;
+        int idx = ListView_HitTest(hwnd, &ht);
+        if (idx != -1) {
+            ListView_SetItemState(hwnd, idx, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+        }
+        break;
+    }
+    }
+    return CallWindowProc(g_oldListProc, hwnd, uMsg, wParam, lParam);
+}
+
 void MyTable::InitListView(HWND hListView) {
     DWORD dwStyle = GetWindowLong(hListView, GWL_STYLE);
-    SetWindowLong(hListView, GWL_STYLE, dwStyle | LVS_REPORT);
+    SetWindowLong(hListView, GWL_STYLE, dwStyle | LVS_REPORT | LVS_SHOWSELALWAYS);
 
     ListView_SetExtendedListViewStyle(hListView,
-        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_TRACKSELECT);
         
     LVCOLUMNA lvc;
     lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
@@ -41,6 +116,10 @@ void MyTable::InitListView(HWND hListView) {
     lvc.pszText = (LPSTR)"y2";
     lvc.cx = 70;
     SendMessageA(hListView, LVM_INSERTCOLUMNA, 4, (LPARAM)&lvc);
+
+    g_oldListProc = (WNDPROC)SetWindowLongPtr(hListView, GWLP_WNDPROC, (LONG_PTR)ListViewSubclass);
+    g_lastHover = -1;
+    g_listTracking = false;
 }
 
 void MyTable::FillListView() {
@@ -141,8 +220,19 @@ void MyTable::Add(const char* name, long x1, long y1, long x2, long y2) {
     SendMessageA(hWndListView, LVM_ENSUREVISIBLE, itemCount, FALSE);
 }
 
+void MyTable::Remove(int index) {
+    if (index < 0 || index >= (int)rows.size()) return;
+    rows.erase(rows.begin() + index);
+    if (hWndListView) FillListView();
+}
+
 void MyTable::Close() {
     if (hWndTable) {
+        if (g_oldListProc && hWndListView) {
+            SetWindowLongPtr(hWndListView, GWLP_WNDPROC, (LONG_PTR)g_oldListProc);
+            g_oldListProc = nullptr;
+        }
+
         DestroyWindow(hWndTable);
         hWndTable = nullptr;
         hWndListView = nullptr;
@@ -197,6 +287,30 @@ INT_PTR CALLBACK MyTable::TableDlgProc(HWND hDlg, UINT message, WPARAM wParam, L
         if (id == IDCANCEL && code == 0) {
             DestroyWindow(hDlg);
             return (INT_PTR)TRUE;
+        }
+        break;
+    }
+
+    case WM_NOTIFY:
+    {
+        LPNMHDR pnmh = (LPNMHDR)lParam;
+        if (!pnmh) break;
+        if (pnmh->idFrom == IDC_LIST_SHAPES) {
+            if (pnmh->code == LVN_ITEMCHANGED) {
+                LPNMLISTVIEW p = (LPNMLISTVIEW)lParam;
+                if (p->uNewState & LVIS_SELECTED) {
+                    if (g_hoverCb) g_hoverCb(p->iItem);
+                } else if (p->uNewState & LVIS_FOCUSED) {
+                    if (g_hoverCb) g_hoverCb(p->iItem);
+                }
+            } else if (pnmh->code == NM_CLICK) {
+                LPNMITEMACTIVATE p = (LPNMITEMACTIVATE)lParam;
+                if (p->iItem != -1) {
+                    if (g_removeCb) g_removeCb(p->iItem);
+                    Remove(p->iItem);
+                }
+            } else if (pnmh->code == NM_CUSTOMDRAW) {
+            }
         }
         break;
     }

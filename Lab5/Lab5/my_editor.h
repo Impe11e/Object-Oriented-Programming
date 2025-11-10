@@ -30,6 +30,8 @@ private:
     EditorType currentType; 
     POINT start;         
     HWND hwndToolBar;
+    HWND mainHwnd;       
+    int hoveredIndex;    
     FILE* fileOut;
 
     void EnsureCapacity();
@@ -54,6 +56,7 @@ public:
     void OnPaint(HWND hWnd, HDC hdc);
 
     void AttachToolbar(HWND hwnd);
+    void AttachMainWindow(HWND hwnd);
 
     void OnToolButtonClick(WPARAM wParam);
     void OnNotify(HWND hWnd, WPARAM wParam, LPARAM lParam);
@@ -67,4 +70,7 @@ public:
         return nullptr;
     }
     EditorType GetCurrentType() const { return currentType; }
+
+    void OnTableHover(int index);
+    void OnTableRemove(int index);
 };

@@ -8,6 +8,15 @@
 
 MyEditor* MyEditor::p_instance = nullptr;
 
+static void TableHoverForward(int idx) {
+    MyEditor* e = MyEditor::getInstance();
+    if (e) e->OnTableHover(idx);
+}
+static void TableRemoveForward(int idx) {
+    MyEditor* e = MyEditor::getInstance();
+    if (e) e->OnTableRemove(idx);
+}
+
 MyEditor* MyEditor::getInstance() {
     if (!p_instance)
         p_instance = new MyEditor();
@@ -46,6 +55,8 @@ MyEditor::MyEditor()
       currentShape(nullptr),
       currentType(NO_EDITOR),
       hwndToolBar(nullptr),
+      mainHwnd(nullptr),
+      hoveredIndex(-1),
       fileOut(nullptr)
 {
     fopen_s(&fileOut, "shapes.txt", "wt");
@@ -54,6 +65,9 @@ MyEditor::MyEditor()
         fclose(fileOut);
         fileOut = nullptr;
     }
+
+    MyTable::SetHoverCallback(TableHoverForward);
+    MyTable::SetRemoveCallback(TableRemoveForward);
 }
 
 MyEditor::~MyEditor() {
@@ -187,6 +201,16 @@ void MyEditor::OnPaint(HWND hWnd, HDC hdc) {
         if (pcshape[i]) pcshape[i]->Show(hdcMem);
     }
 
+    if (hoveredIndex >= 0 && hoveredIndex < shapeCount && pcshape[hoveredIndex]) {
+        HPEN hRedPen = CreatePen(PS_SOLID, 2, RGB(255,0,0));
+        HPEN hPrev = (HPEN)SelectObject(hdcMem, hRedPen);
+        HBRUSH hOldBrush = (HBRUSH)SelectObject(hdcMem, GetStockObject(NULL_BRUSH));
+        pcshape[hoveredIndex]->Show(hdcMem);
+        SelectObject(hdcMem, hOldBrush);
+        SelectObject(hdcMem, hPrev);
+        DeleteObject(hRedPen);
+    }
+
     if (currentShape) currentShape->Show(hdcMem);
 
     BitBlt(hdc, 0, 0, rcClient.right, rcClient.bottom, hdcMem, 0, 0, SRCCOPY);
@@ -200,6 +224,10 @@ void MyEditor::OnPaint(HWND hWnd, HDC hdc) {
 
 void MyEditor::AttachToolbar(HWND hwnd) {
     hwndToolBar = hwnd;
+}
+
+void MyEditor::AttachMainWindow(HWND hwnd) {
+    mainHwnd = hwnd;
 }
 
 void MyEditor::OnToolButtonClick(WPARAM wParam) {
@@ -256,4 +284,23 @@ void MyEditor::OnSize(HWND hWnd, HWND hwndToolBar_) {
     GetClientRect(hWnd, &rc);
     GetWindowRect(hwndToolBar_, &rw);
     MoveWindow(hwndToolBar_, 0, 0, rc.right - rc.left, rw.bottom - rw.top, FALSE);
+}
+
+void MyEditor::OnTableHover(int index) {
+    if (index < 0 || index >= shapeCount) {
+        hoveredIndex = -1;
+    } else {
+        hoveredIndex = index;
+    }
+    if (mainHwnd) InvalidateRect(mainHwnd, NULL, FALSE);
+}
+
+void MyEditor::OnTableRemove(int index) {
+    if (index < 0 || index >= shapeCount) return;
+    delete pcshape[index];
+    for (int i = index; i < shapeCount - 1; ++i) pcshape[i] = pcshape[i+1];
+    --shapeCount;
+    pcshape[shapeCount] = nullptr;
+
+    if (mainHwnd) InvalidateRect(mainHwnd, NULL, FALSE);
 }

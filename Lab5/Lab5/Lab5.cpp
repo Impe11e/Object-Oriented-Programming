@@ -91,6 +91,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
         // logger?
     }
 
+    MyEditor* ped = MyEditor::getInstance();
+    if (ped) ped->AttachMainWindow(hWnd);
+
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
 
