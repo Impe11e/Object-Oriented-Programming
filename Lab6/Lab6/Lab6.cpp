@@ -58,51 +58,84 @@ private:
 
     bool LaunchExeWithArgs(const std::wstring &exeName, const std::wstring &args)
     {
+        auto tryCreate = [&](const std::wstring &full)->bool {
+            std::wstring cmdline = L"\"" + full + L"\"" + (args.empty() ? L"" : L" " + args);
+            std::vector<wchar_t> cmdbuf(cmdline.begin(), cmdline.end()); cmdbuf.push_back(0);
+            STARTUPINFOW si = {0}; si.cb = sizeof(si);
+            PROCESS_INFORMATION pi = {0};
+            if (CreateProcessW(NULL, cmdbuf.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+            {
+                CloseHandle(pi.hThread); CloseHandle(pi.hProcess); return true;
+            }
+            HINSTANCE h = ShellExecuteW(NULL, L"open", full.c_str(), args.empty() ? NULL : args.c_str(), NULL, SW_SHOWNORMAL);
+            if ((INT_PTR)h > 32) return true;
+            return false;
+        };
+
+        wchar_t found[MAX_PATH] = {0};
+        DWORD len = SearchPathW(NULL, exeName.c_str(), NULL, MAX_PATH, found, NULL);
+        if (len > 0 && len < MAX_PATH)
+        {
+            if (tryCreate(found)) return true;
+        }
+        bool hasExe = (exeName.size() >= 4 && _wcsicmp(exeName.c_str() + exeName.size() - 4, L".exe") == 0);
+        if (!hasExe)
+        {
+            std::wstring withExe = exeName + L".exe";
+            len = SearchPathW(NULL, withExe.c_str(), NULL, MAX_PATH, found, NULL);
+            if (len > 0 && len < MAX_PATH)
+            {
+                if (tryCreate(found)) return true;
+            }
+        }
+
         wchar_t modulePath[MAX_PATH];
-        if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) return false;
+        if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) {
+            MessageBoxW(NULL, L"GetModuleFileNameW failed", L"Lab6 Debug", MB_OK | MB_ICONERROR);
+            return false;
+        }
         std::wstring path(modulePath);
         size_t pos = path.find_last_of(L"\\/");
         std::wstring dir = (pos == std::wstring::npos) ? L"." : path.substr(0, pos+1);
 
         std::vector<std::wstring> candidates;
         candidates.push_back(dir + exeName);
+        if (!hasExe) candidates.push_back(dir + exeName + L".exe");
+        candidates.push_back(dir + L"..\\Debug\\" + exeName);
+        candidates.push_back(dir + L"..\\Release\\" + exeName);
         candidates.push_back(dir + L"..\\Object2\\Debug\\" + exeName);
         candidates.push_back(dir + L"..\\Object2\\Release\\" + exeName);
         candidates.push_back(dir + L"..\\Object3\\Debug\\" + exeName);
         candidates.push_back(dir + L"..\\Object3\\Release\\" + exeName);
-        candidates.push_back(dir + L"..\\Debug\\" + exeName);
-        candidates.push_back(dir + L"..\\Release\\" + exeName);
 
-        for (const auto &full : candidates)
+        size_t p2 = dir.find_last_of(L"\\/", pos - 1);
+        if (p2 != std::wstring::npos) {
+            std::wstring parent = dir.substr(0, p2+1);
+            candidates.push_back(parent + exeName);
+            candidates.push_back(parent + L"Debug\\" + exeName);
+            candidates.push_back(parent + L"Release\\" + exeName);
+        }
+
+        std::vector<std::pair<std::wstring,bool>> checked;
+        for (auto &c : candidates)
         {
-            std::wstring cmd = L"\"" + full + L"\"";
-            if (!args.empty()) cmd += L" " + args;
-            std::vector<wchar_t> cmdbuf(cmd.begin(), cmd.end()); cmdbuf.push_back(0);
-            STARTUPINFOW si = {0}; si.cb = sizeof(si);
-            PROCESS_INFORMATION pi = {0};
-            if (CreateProcessW(NULL, cmdbuf.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+            DWORD attr = GetFileAttributesW(c.c_str());
+            bool exists = (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY));
+            checked.emplace_back(c, exists);
+            if (exists)
             {
-                CloseHandle(pi.hThread);
-                CloseHandle(pi.hProcess);
-                return true;
+                if (tryCreate(c)) return true;
             }
-            HINSTANCE h = ShellExecuteW(NULL, L"open", full.c_str(), args.empty() ? NULL : args.c_str(), NULL, SW_SHOWNORMAL);
-            if ((INT_PTR)h > 32) return true;
         }
 
-        std::wstring cmd = L"\"" + exeName + L"\"";
-        if (!args.empty()) cmd += L" " + args;
-        std::vector<wchar_t> cmdbuf(cmd.begin(), cmd.end()); cmdbuf.push_back(0);
-        STARTUPINFOW si = {0}; si.cb = sizeof(si);
-        PROCESS_INFORMATION pi = {0};
-        if (CreateProcessW(NULL, cmdbuf.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
-        {
-            CloseHandle(pi.hThread);
-            CloseHandle(pi.hProcess);
-            return true;
-        }
-        HINSTANCE h = ShellExecuteW(NULL, L"open", exeName.c_str(), args.empty() ? NULL : args.c_str(), NULL, SW_SHOWNORMAL);
-        if ((INT_PTR)h > 32) return true;
+        if (tryCreate(exeName)) return true;
+        if (!hasExe) { std::wstring withExe = exeName + L".exe"; if (tryCreate(withExe)) return true; }
+
+        std::wostringstream dbg;
+        dbg << L"LaunchExeWithArgs failed to find/run '" << exeName << L"'.\nModule dir: " << dir << L"\nTried paths:\n";
+        for (auto &p : checked) dbg << (p.second ? L"[FOUND] " : L"[MISSING] ") << p.first << L"\n";
+        dbg << L"Also tried SearchPath and direct CreateProcess by name.\n";
+        MessageBoxW(NULL, dbg.str().c_str(), L"Lab6 Debug - LaunchExeWithArgs", MB_OK | MB_ICONERROR);
 
         return false;
     }
@@ -193,10 +226,14 @@ private:
                 {
                     long params[5]; memcpy(params, h, sizeof(params));
                     HWND hObj2 = FindWindowW(L"OBJECT2", NULL);
+
                     if (!hObj2)
                     {
                         std::wstring args = std::to_wstring((UINT_PTR)hWnd);
-                        LaunchExeWithArgs(L"Object2.exe", args);
+                        bool launched = LaunchExeWithArgs(L"Object2.exe", args);
+                        if (!launched) {
+                            MessageBoxW(hWnd, L"Failed to launch Object2.exe (LaunchExeWithArgs returned false)", L"Lab6 Debug", MB_OK | MB_ICONERROR);
+                        }
                     }
                     else
                     {

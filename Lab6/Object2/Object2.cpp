@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <commctrl.h>
 
+#pragma comment(lib, "comctl32.lib")
+
 #ifndef _WIN32_IE
 #define _WIN32_IE 0x0500
 #endif
