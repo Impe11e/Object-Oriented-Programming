@@ -123,9 +123,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="cube.h" />
+    <ClInclude Include="ellipse.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Lab5.h" />
+    <ClInclude Include="line.h" />
+    <ClInclude Include="linewithcircles.h" />
     <ClInclude Include="my_table.h" />
+    <ClInclude Include="point.h" />
+    <ClInclude Include="rectangle.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="resource1.h" />
     <ClInclude Include="resource2.h" />
@@ -136,8 +142,14 @@
     <ClInclude Include="my_editor.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cube.cpp" />
+    <ClCompile Include="ellipse.cpp" />
     <ClCompile Include="Lab5.cpp" />
+    <ClCompile Include="line.cpp" />
+    <ClCompile Include="linewithcircles.cpp" />
     <ClCompile Include="my_table.cpp" />
+    <ClCompile Include="point.cpp" />
+    <ClCompile Include="rectangle.cpp" />
     <ClCompile Include="shape.cpp" />
     <ClCompile Include="my_editor.cpp" />
     <ClCompile Include="toolbar.cpp" />

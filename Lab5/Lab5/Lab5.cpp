@@ -3,8 +3,15 @@
 #include "my_editor.h"
 #include "my_table.h"
 #include "toolbar.h"
+#include "point.h"
+#include "line.h"
+#include "rectangle.h"
+#include "ellipse.h"
+#include "linewithcircles.h"
+#include "cube.h"
 #include <commctrl.h>
 #include <functional>
+#include <commdlg.h>
 #pragma comment(lib, "Comctl32.lib")
 
 #define MAX_LOADSTRING 100
@@ -18,7 +25,7 @@ Toolbar toolbar;
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM); 
+INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -145,7 +152,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         int wmId = LOWORD(wParam);
 
-        static const std::pair<int, std::function<Shape*()>> shapeCommands[] = {
+        static const std::pair<int, std::function<Shape* ()>> shapeCommands[] = {
             { ID_POINT,   []() -> Shape* { return new PointShape(); } },
             { ID_LINE,    []() -> Shape* { return new LineShape(); } },
             { ID_RECTANGLE,[]() -> Shape* { return new RectShape(); } },
@@ -169,6 +176,50 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
         switch (wmId)
         {
+        case IDM_LOAD: {
+            OPENFILENAMEW ofn = { 0 };
+            wchar_t szFileW[MAX_PATH];
+            szFileW[0] = L'\0';
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = hWnd;
+            ofn.lpstrFilter = L"Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0\0";
+            ofn.lpstrFile = szFileW;
+            ofn.nMaxFile = MAX_PATH;
+            ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+            ofn.nFilterIndex = 1;
+            if (GetOpenFileNameW(&ofn)) {
+                int res = MessageBoxW(hWnd, L"Replace current objects?\nYes = replace, No = append", L"Load", MB_YESNOCANCEL | MB_ICONQUESTION);
+                if (res == IDYES || res == IDNO) {
+                    char ansiPath[MAX_PATH];
+                    int conv = WideCharToMultiByte(CP_UTF8, 0, szFileW, -1, ansiPath, MAX_PATH, NULL, NULL);
+                    if (conv > 0) {
+                        ped->LoadFromFile(ansiPath, res == IDYES);
+                    }
+                }
+            }
+            break;
+        }
+        case IDM_SAVEAS: {
+            OPENFILENAMEW ofn = { 0 };
+            wchar_t szFileW[MAX_PATH];
+            szFileW[0] = L'\0';
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = hWnd;
+            ofn.lpstrFilter = L"Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0\0";
+            ofn.lpstrFile = szFileW;
+            ofn.nMaxFile = MAX_PATH;
+            ofn.Flags = OFN_EXPLORER | OFN_OVERWRITEPROMPT;
+            ofn.nFilterIndex = 1;
+            if (GetSaveFileNameW(&ofn)) {
+                char ansiPath[MAX_PATH];
+                int conv = WideCharToMultiByte(CP_UTF8, 0, szFileW, -1, ansiPath, MAX_PATH, NULL, NULL);
+                if (conv > 0) {
+                    ped->SaveToFile(ansiPath);
+                }
+            }
+            break;
+        }
+
         case IDM_TABLE:
             MyTable::Toggle(hWnd, hInst);
             break;

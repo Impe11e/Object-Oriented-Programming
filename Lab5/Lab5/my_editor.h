@@ -73,4 +73,7 @@ public:
 
     void OnTableHover(int index);
     void OnTableRemove(int index);
+
+    void LoadFromFile(const char* filename, bool replace = true);
+    void SaveToFile(const char* filename);
 };

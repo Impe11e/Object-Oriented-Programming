@@ -15,6 +15,13 @@ static WNDPROC g_oldListProc = nullptr;
 static int g_lastHover = -1;
 static bool g_listTracking = false;
 
+void MyTable::Clear() {
+    rows.clear();
+    if (hWndListView) {
+        SendMessageA(hWndListView, LVM_DELETEALLITEMS, 0, 0);
+    }
+}
+
 void MyTable::SetHoverCallback(HoverCallback cb) {
     g_hoverCb = cb;
 }
