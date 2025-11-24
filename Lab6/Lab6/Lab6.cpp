@@ -4,29 +4,55 @@
 #include <vector>
 #include <sstream>
 #include <shellapi.h>
+#include <fstream>
 
 #define MAX_LOADSTRING 100
 
-HINSTANCE hInst;                               
-WCHAR szTitle[MAX_LOADSTRING];              
-WCHAR szWindowClass[MAX_LOADSTRING];         
+#define WM_APP_OBJECT2_READY    (WM_USER + 1)
+#define WM_APP_OBJECT3_READY    (WM_USER + 2)
+#define WM_APP_DATA_GENERATED   (WM_USER + 3)
+#define APP_SEND_PARAMS         (WM_APP + 1)
+#define IDM_PROCESS_DATA        (WM_USER + 4)
+#define WM_APP_TOO_MANY_POINTS  (WM_USER + 5)
+
+HINSTANCE hInst;                                
+WCHAR szTitle[MAX_LOADSTRING];                
+WCHAR szWindowClass[MAX_LOADSTRING];          
+HWND g_hWndObject2 = NULL;
+HWND g_hWndObject3 = NULL;
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                MyInitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
+static void Lab6Log(const std::wstring &s)
+{
+    wchar_t modulePath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) return;
+    std::wstring path(modulePath);
+    size_t pos = path.find_last_of(L"\\/");
+    std::wstring dir = (pos == std::wstring::npos) ? L"." : path.substr(0, pos+1);
+    std::wstring log = dir + L"lab6_debug.txt";
+    std::wofstream ofs(log, std::ios::app);
+    if (ofs) ofs << s << std::endl;
+}
+
 int SendCopyData(HWND hWndDest, HWND hWndSrc, void *lp, long cb)
 {
+    Lab6Log(L"SendCopyData called");
     COPYDATASTRUCT cds;
     cds.dwData = 1;
     cds.cbData = cb;
     cds.lpData = lp;
-    return (int)SendMessage(hWndDest, WM_COPYDATA, (WPARAM)hWndSrc, (LPARAM)&cds);
+    int res = (int)SendMessage(hWndDest, WM_COPYDATA, (WPARAM)hWndSrc, (LPARAM)&cds);
+    std::wostringstream ss; ss << L"SendCopyData result=" << res; Lab6Log(ss.str());
+    return res;
 }
 
-bool LaunchExeWithCandidates(const std::wstring &exeName)
+bool LaunchExeWithArgs(const std::wstring &exeName, const std::wstring &args)
 {
+    Lab6Log(std::wstring(L"LaunchExeWithArgs: ") + exeName + L" args=" + args);
     wchar_t modulePath[MAX_PATH];
     if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) return false;
     std::wstring path(modulePath);
@@ -44,59 +70,63 @@ bool LaunchExeWithCandidates(const std::wstring &exeName)
 
     for (const auto &full : candidates)
     {
-        HINSTANCE h = ShellExecuteW(NULL, L"open", full.c_str(), NULL, NULL, SW_SHOWNORMAL);
-        if ((INT_PTR)h > 32) return true;
+        std::wstring cmd = L"\"" + full + L"\"";
+        if (!args.empty()) cmd += L" " + args;
+        std::vector<wchar_t> cmdbuf(cmd.begin(), cmd.end()); cmdbuf.push_back(0);
+        STARTUPINFOW si = {0}; si.cb = sizeof(si);
+        PROCESS_INFORMATION pi = {0};
+        if (CreateProcessW(NULL, cmdbuf.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+        {
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+            Lab6Log(std::wstring(L"CreateProcess OK: ") + full);
+            return true;
+        }
+        Lab6Log(std::wstring(L"CreateProcess failed, try ShellExecute: ") + full);
+        HINSTANCE h = ShellExecuteW(NULL, L"open", full.c_str(), args.empty() ? NULL : args.c_str(), NULL, SW_SHOWNORMAL);
+        if ((INT_PTR)h > 32) { Lab6Log(std::wstring(L"ShellExecute OK: ") + full); return true; }
     }
 
-    HINSTANCE h = ShellExecuteW(NULL, L"open", exeName.c_str(), NULL, NULL, SW_SHOWNORMAL);
-    if ((INT_PTR)h > 32) return true;
+    std::wstring cmd = L"\"" + exeName + L"\"";
+    if (!args.empty()) cmd += L" " + args;
+    std::vector<wchar_t> cmdbuf(cmd.begin(), cmd.end()); cmdbuf.push_back(0);
+    STARTUPINFOW si = {0}; si.cb = sizeof(si);
+    PROCESS_INFORMATION pi = {0};
+    if (CreateProcessW(NULL, cmdbuf.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+    {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        Lab6Log(std::wstring(L"CreateProcess OK (fallback): ") + exeName);
+        return true;
+    }
+    HINSTANCE h = ShellExecuteW(NULL, L"open", exeName.c_str(), args.empty() ? NULL : args.c_str(), NULL, SW_SHOWNORMAL);
+    if ((INT_PTR)h > 32) { Lab6Log(std::wstring(L"ShellExecute OK (fallback): ") + exeName); return true; }
 
+    Lab6Log(L"LaunchExeWithArgs failed");
     return false;
 }
 
-std::wstring GetClipboardUnicodeText(HWND owner)
+static void ArrangeWindows(HWND hMain)
 {
-    std::wstring res;
-    if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return res;
-    if (!OpenClipboard(owner)) return res;
-    HGLOBAL h = GetClipboardData(CF_UNICODETEXT);
-    if (h)
-    {
-        LPCWSTR p = (LPCWSTR)GlobalLock(h);
-        if (p) res = p;
-        GlobalUnlock(h);
-    }
-    CloseClipboard();
-    return res;
-}
+    int screenW = GetSystemMetrics(SM_CXSCREEN);
+    int screenH = GetSystemMetrics(SM_CYSCREEN);
 
-std::vector<long> ParsePointsFromText(const std::wstring &text)
-{
-    std::vector<long> out;
-    std::wistringstream iss(text);
-    std::wstring line;
-    while (std::getline(iss, line))
+    int topHeight = screenH / 3;
+    int bottomHeight = screenH - topHeight;
+    int leftWidth = screenW / 2;
+    int rightWidth = screenW - leftWidth;
+
+    SetWindowPos(hMain, HWND_TOP, 0, 0, leftWidth, topHeight, SWP_SHOWWINDOW);
+
+    if (g_hWndObject2 && IsWindow(g_hWndObject2))
     {
-        if (line.empty()) continue;
-        if (!line.empty() && line.back() == L'\r') line.pop_back();
-        std::wistringstream ls(line);
-        std::wstring a, b;
-        if (std::getline(ls, a, L'\t'))
-        {
-            if (!std::getline(ls, b, L'\t')) {
-                ls.clear(); ls.str(line);
-                ls >> a >> b;
-            }
-            try {
-                long x = std::stol(a);
-                long y = std::stol(b);
-                out.push_back(x);
-                out.push_back(y);
-            } catch(...) {
-            }
-        }
+        SetWindowPos(g_hWndObject2, HWND_TOP, leftWidth, 0, rightWidth, topHeight, SWP_SHOWWINDOW);
     }
-    return out;
+
+    if (g_hWndObject3 && IsWindow(g_hWndObject3))
+    {
+        SetWindowPos(g_hWndObject3, HWND_TOP, 0, topHeight, screenW, bottomHeight, SWP_SHOWWINDOW);
+    }
 }
 
 INT_PTR CALLBACK ParamsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -126,7 +156,7 @@ INT_PTR CALLBACK ParamsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             {
                 memcpy(mem, params, sizeof(params));
                 SetPropW(hParent, L"LAB6_PARAMS", (HANDLE)mem);
-                PostMessage(hParent, WM_APP+1, 0, 0);
+                PostMessage(hParent, APP_SEND_PARAMS, 0, 0);
             }
             EndDialog(hDlg, IDOK);
             return (INT_PTR)TRUE;
@@ -259,7 +289,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_APP+1:
+    case APP_SEND_PARAMS:
         {
             void* p = GetPropW(hWnd, L"LAB6_PARAMS");
             if (p)
@@ -270,62 +300,57 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 HWND hObj2 = FindWindowW(L"OBJECT2", NULL);
                 if (!hObj2)
                 {
-                    LaunchExeWithCandidates(L"Object2.exe");
-                    hObj2 = WaitForWindow(L"OBJECT2", 5000);
+                    std::wstring args = std::to_wstring((UINT_PTR)hWnd);
+                    LaunchExeWithArgs(L"Object2.exe", args);
                 }
-                if (hObj2)
+                else
                 {
-                    ShowWindow(hObj2, SW_SHOWNORMAL);
-                    SetForegroundWindow(hObj2);
                     SendCopyData(hObj2, hWnd, params, sizeof(params));
                 }
-
-                HWND hObj3 = FindWindowW(L"OBJECT3", NULL);
-                if (!hObj3)
-                {
-                    LaunchExeWithCandidates(L"Object3.exe");
-                    hObj3 = WaitForWindow(L"OBJECT3", 5000);
-                }
-                if (hObj3)
-                {
-                    ShowWindow(hObj3, SW_SHOWNORMAL);
-                    SetForegroundWindow(hObj3);
-                }
-
-                if (hObj2 || hObj3)
-                {
-                    int screenW = GetSystemMetrics(SM_CXSCREEN);
-                    int screenH = GetSystemMetrics(SM_CYSCREEN);
-                    int w = screenW / 2;
-                    int h = screenH * 3 / 4;
-                    if (hObj2) SetWindowPos(hObj2, HWND_TOP, 0, 0, w, h, SWP_SHOWWINDOW);
-                    if (hObj3) SetWindowPos(hObj3, HWND_TOP, w, 0, w, h, SWP_SHOWWINDOW);
-                }
-
-                std::wstring clip;
-                const int maxWait = 3000;
-                int waited = 0;
-                const int step = 200;
-                while (waited < maxWait)
-                {
-                    clip = GetClipboardUnicodeText(hWnd);
-                    if (!clip.empty()) break;
-                    Sleep(step);
-                    waited += step;
-                }
-
-                if (!clip.empty() && hObj3)
-                {
-                    std::vector<long> pairs = ParsePointsFromText(clip);
-                    if (!pairs.empty())
-                    {
-                        SendCopyData(hObj3, hWnd, pairs.data(), (long)(pairs.size()*sizeof(long)));
-                        PostMessage(hObj3, WM_PAINT, 0, 0);
-                    }
-                }
-
-                CleanupParams(hWnd);
             }
+        }
+        break;
+    case WM_APP_OBJECT2_READY:
+        {
+            HWND child = (HWND)wParam;
+            g_hWndObject2 = child;
+            void* p = GetPropW(hWnd, L"LAB6_PARAMS");
+            if (p)
+            {
+                long params[5]; memcpy(params, p, sizeof(params));
+                SendCopyData(child, hWnd, params, sizeof(params));
+            }
+            ArrangeWindows(hWnd);
+        }
+        break;
+    case WM_APP_TOO_MANY_POINTS:
+        {
+            int requested = (int)wParam;
+            int adjusted = (int)lParam;
+            wchar_t buf[256];
+            _snwprintf_s(buf, _countof(buf), L"Requested %d points but range allows only %d unique X values. Generated %d points.", requested, adjusted, adjusted);
+            MessageBoxW(hWnd, buf, L"Lab6: points adjusted", MB_OK | MB_ICONWARNING);
+        }
+        break;
+    case WM_APP_DATA_GENERATED:
+        {
+            HWND hObj3 = FindWindowW(L"OBJECT3", NULL);
+            if (!hObj3)
+            {
+                std::wstring args = std::to_wstring((UINT_PTR)hWnd);
+                LaunchExeWithArgs(L"Object3.exe", args);
+            }
+            else
+            {
+                PostMessage(hObj3, WM_COMMAND, IDM_PROCESS_DATA, 0);
+            }
+        }
+        break;
+    case WM_APP_OBJECT3_READY:
+        {
+            g_hWndObject3 = (HWND)wParam;
+            PostMessage(g_hWndObject3, WM_COMMAND, IDM_PROCESS_DATA, 0);
+            ArrangeWindows(hWnd);
         }
         break;
     case WM_PAINT:

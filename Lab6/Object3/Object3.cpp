@@ -1,41 +1,52 @@
 ﻿#include "framework.h"
 #include "Object3.h"
+#include <shellapi.h>
 #include <vector>
-#include <cwchar>
+#include <string>
+#include <sstream>
+#include <algorithm>
 
 #define MAX_LOADSTRING 100
 
-HINSTANCE hInst;                           
-WCHAR szTitle[MAX_LOADSTRING];              
-WCHAR szWindowClass[MAX_LOADSTRING];         
+#define WM_APP_OBJECT3_READY    (WM_USER + 2)
+#define IDM_PROCESS_DATA        (WM_USER + 4)
 
-struct Pt { int x; int y; };
-static std::vector<Pt> g_points;
+struct Point { int x, y; };
+
+HINSTANCE hInst;
+WCHAR szTitle[MAX_LOADSTRING];
+WCHAR szWindowClass[MAX_LOADSTRING];
+std::vector<Point> g_data;
+HWND g_hParent = NULL;
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+std::wstring        GetTextFromClipboardWstr(HWND hWnd);
+void                ProcessData(HWND hWnd);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR    lpCmdLine,
+    _In_ int       nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
-    UNREFERENCED_PARAMETER(lpCmdLine);
+
+    int argc;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (argc > 1) {
+        g_hParent = (HWND)(UINT_PTR)_wtoi(argv[1]);
+    }
+    LocalFree(argv);
 
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_OBJECT3, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
-    if (!InitInstance (hInstance, nCmdShow))
-    {
-        return FALSE;
-    }
+    if (!InitInstance(hInstance, nCmdShow)) return FALSE;
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_OBJECT3));
-
     MSG msg;
 
     while (GetMessage(&msg, nullptr, 0, 0))
@@ -47,147 +58,190 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
     }
 
-    return (int) msg.wParam;
+    return (int)msg.wParam;
 }
 
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
-
     wcex.cbSize = sizeof(WNDCLASSEX);
-
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_OBJECT3));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_OBJECT3);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
-
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_OBJECT3));
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_OBJECT3);
+    wcex.lpszClassName = szWindowClass;
+    wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
     return RegisterClassExW(&wcex);
-}
-
-void DrawGraph(HWND hWnd, HDC hdc)
-{
-    RECT rc; GetClientRect(hWnd, &rc);
-    FillRect(hdc, &rc, (HBRUSH)(COLOR_WINDOW+1));
-    if (g_points.empty()) return;
-
-    int margin = 40;
-    int w = rc.right - rc.left - margin*2;
-    int h = rc.bottom - rc.top - margin*2;
-    if (w<=0 || h<=0) return;
-
-    int xMin = g_points.front().x, xMax = g_points.front().x;
-    int yMin = g_points.front().y, yMax = g_points.front().y;
-    for (size_t ii = 0; ii < g_points.size(); ++ii) { auto &p = g_points[ii]; if (p.x < xMin) xMin = p.x; if (p.x> xMax) xMax = p.x; if (p.y<yMin) yMin=p.y; if (p.y>yMax) yMax=p.y; }
-    int rangeX = xMax - xMin; if (rangeX==0) rangeX=1;
-    int rangeY = yMax - yMin; if (rangeY==0) rangeY=1;
-
-    HPEN hOldPen = (HPEN)SelectObject(hdc, GetStockObject(BLACK_PEN));
-    LOGBRUSH lb = { BS_SOLID, RGB(0,0,0), 0 };
-    HPEN hAxisPen = CreatePen(PS_SOLID, 2, RGB(0,0,0));
-    SelectObject(hdc, hAxisPen);
-    MoveToEx(hdc, margin, margin + h, NULL); LineTo(hdc, margin + w, margin + h);
-    MoveToEx(hdc, margin, margin + h, NULL); LineTo(hdc, margin, margin);
-    SelectObject(hdc, hOldPen);
-    DeleteObject(hAxisPen);
-
-    std::vector<POINT> pts;
-    pts.reserve(g_points.size());
-    for (size_t i=0;i<g_points.size();++i)
-    {
-        int sx = margin + (int)((long long)(g_points[i].x - xMin) * w / rangeX);
-        int sy = margin + h - (int)((long long)(g_points[i].y - yMin) * h / rangeY);
-        POINT pt = { sx, sy };
-        pts.push_back(pt);
-    }
-
-    HPEN hPen = CreatePen(PS_SOLID, 1, RGB(100,100,100));
-    HPEN hOld = (HPEN)SelectObject(hdc, hPen);
-    if (!pts.empty()) Polyline(hdc, pts.data(), (int)pts.size());
-    SelectObject(hdc, hOld);
-    DeleteObject(hPen);
-
-    HBRUSH hBrushDot = CreateSolidBrush(RGB(0,0,0));
-    HBRUSH hOldBrush = (HBRUSH)SelectObject(hdc, hBrushDot);
-    for (size_t i=0;i<pts.size();++i)
-    {
-        int r = 4;
-        Ellipse(hdc, pts[i].x - r, pts[i].y - r, pts[i].x + r, pts[i].y + r);
-    }
-    SelectObject(hdc, hOldBrush);
-    DeleteObject(hBrushDot);
-
-    wchar_t buf[64];
-    _snwprintf_s(buf, _countof(buf), L"%d", xMin);
-    TextOutW(hdc, margin, margin + h + 2, buf, (int)wcslen(buf));
-    _snwprintf_s(buf, _countof(buf), L"%d", xMax);
-    TextOutW(hdc, margin + w - 30, margin + h + 2, buf, (int)wcslen(buf));
-    _snwprintf_s(buf, _countof(buf), L"%d", yMin);
-    TextOutW(hdc, 2, margin + h - 10, buf, (int)wcslen(buf));
-    _snwprintf_s(buf, _countof(buf), L"%d", yMax);
-    TextOutW(hdc, 2, margin - 10, buf, (int)wcslen(buf));
-}
-
-void OnCopyDataHandle(HWND hWnd, WPARAM wParam, LPARAM lParam)
-{
-    COPYDATASTRUCT *cds = (COPYDATASTRUCT*)lParam;
-    if (!cds) return;
-    if (cds->cbData >= sizeof(long)*5 && cds->cbData <= sizeof(long)*5)
-    {
-    }
-    else
-    {
-        int count = cds->cbData / sizeof(long);
-        if (count % 2 == 0)
-        {
-            int n = count/2;
-            g_points.clear();
-            long *p = (long*)cds->lpData;
-            for (int i=0;i<n;i++) g_points.push_back({(int)p[2*i], (int)p[2*i+1]});
-            InvalidateRect(hWnd, NULL, TRUE);
-        }
-    }
 }
 
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance;
+    hInst = hInstance;
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0, 500, 400, nullptr, nullptr, hInstance, nullptr);
+    if (!hWnd) return FALSE;
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+    return TRUE;
+}
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, 600, 400, nullptr, nullptr, hInstance, nullptr);
+std::wstring GetTextFromClipboardWstr(HWND hWnd) {
+    std::wstring res;
+    if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return res;
+    if (!OpenClipboard(hWnd)) return res;
+    HGLOBAL hData = GetClipboardData(CF_UNICODETEXT);
+    if (hData == NULL) { CloseClipboard(); return L""; }
+    LPCWSTR pszText = static_cast<LPCWSTR>(GlobalLock(hData));
+    if (!pszText) { CloseClipboard(); return L""; }
+    res = pszText;
+    GlobalUnlock(hData);
+    CloseClipboard();
+    return res;
+}
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+void ProcessData(HWND hWnd) {
+    g_data.clear();
+    std::wstring clipboardText = GetTextFromClipboardWstr(hWnd);
+    if (clipboardText.empty()) return;
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+    std::wistringstream ss(clipboardText);
+    int x, y;
+    while (ss >> x >> y) {
+        g_data.push_back({ x, y });
+    }
 
-   return TRUE;
+    InvalidateRect(hWnd, NULL, TRUE);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-    case WM_COPYDATA:
-        OnCopyDataHandle(hWnd, wParam, lParam);
-        break;
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            DrawGraph(hWnd, hdc);
-            EndPaint(hWnd, &ps);
+    case WM_CREATE:
+        if (g_hParent) {
+            PostMessage(g_hParent, WM_APP_OBJECT3_READY, (WPARAM)hWnd, 0);
         }
         break;
+    case WM_COMMAND:
+    {
+        int wmId = LOWORD(wParam);
+        switch (wmId)
+        {
+        case IDM_PROCESS_DATA:
+            ProcessData(hWnd);
+            break;
+        case IDM_ABOUT:
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+            break;
+        case IDM_EXIT:
+            DestroyWindow(hWnd);
+            break;
+        default:
+            return DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    }
+    break;
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+
+        int margin = 50;
+        MoveToEx(hdc, margin, rc.bottom - margin, NULL); LineTo(hdc, rc.right - 20, rc.bottom - margin);
+        MoveToEx(hdc, margin, rc.bottom - margin, NULL); LineTo(hdc, margin, 20);
+        TextOut(hdc, rc.right - 15, rc.bottom - margin - 10, L"X", 1);
+        TextOut(hdc, margin - 10, 5, L"Y", 1);
+
+        if (g_data.size() > 0) {
+            int minX = 0;
+            int minY = 0;
+            int maxX = g_data.front().x;
+            int maxY = g_data.front().y;
+            for (const auto& p : g_data) {
+                if (p.x < minX) minX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y > maxY) maxY = p.y;
+            }
+            if (maxX == minX) maxX = minX + 1;
+            if (maxY == minY) maxY = minY + 1;
+
+            double scaleX = (double)(rc.right - margin - 20 - margin) / (maxX - minX);
+            double scaleY = (double)(rc.bottom - margin - 20 - margin) / (maxY - minY);
+
+            SetBkMode(hdc, TRANSPARENT);
+
+            const int nIntervals = 4;
+
+            SetTextAlign(hdc, TA_CENTER | TA_TOP);
+            int x_axis_y_pos = rc.bottom - margin + 5;
+
+            for (int i = 0; i <= nIntervals; ++i)
+            {
+                int currentX = minX + (i * (maxX - minX) / nIntervals);
+                int pixelX = margin + (int)((currentX - minX) * scaleX);
+
+                std::wstring strX = std::to_wstring(currentX);
+                TextOut(hdc, pixelX, x_axis_y_pos, strX.c_str(), (int)strX.length());
+            }
+
+            SetTextAlign(hdc, TA_RIGHT | TA_BASELINE);
+            int y_axis_x_pos = margin - 10;
+
+            for (int i = 0; i <= nIntervals; ++i)
+            {
+                int currentY = minY + (i * (maxY - minY) / nIntervals);
+                int pixelY = rc.bottom - margin - (int)((currentY - minY) * scaleY);
+                if (pixelY < 20) pixelY = 20;
+
+                std::wstring strY = std::to_wstring(currentY);
+                TextOut(hdc, y_axis_x_pos, pixelY, strY.c_str(), (int)strY.length());
+            }
+
+            std::vector<Point> sorted = g_data;
+            std::sort(sorted.begin(), sorted.end(), [](const Point &a, const Point &b){ return a.x < b.x; });
+
+            HPEN hLinePen = CreatePen(PS_SOLID, 1, RGB(100, 100, 255));
+            HPEN hOldPen = (HPEN)SelectObject(hdc, hLinePen);
+
+            int startX = margin + (int)((sorted[0].x - minX) * scaleX);
+            int startY = rc.bottom - margin - (int)((sorted[0].y - minY) * scaleY);
+            MoveToEx(hdc, startX, startY, NULL);
+
+            for (size_t i = 1; i < sorted.size(); ++i) {
+                int nextX = margin + (int)((sorted[i].x - minX) * scaleX);
+                int nextY = rc.bottom - margin - (int)((sorted[i].y - minY) * scaleY);
+                LineTo(hdc, nextX, nextY);
+            }
+            SelectObject(hdc, hOldPen);
+            DeleteObject(hLinePen);
+
+            HBRUSH hPointBrush = CreateSolidBrush(RGB(255, 0, 0));
+            HBRUSH hOldBrush = (HBRUSH)SelectObject(hdc, hPointBrush);
+            HPEN hOld = (HPEN)SelectObject(hdc, GetStockObject(NULL_PEN));
+
+            const int pointRadius = 4;
+
+            for (const auto& point : g_data) {
+                int px = margin + (int)((point.x - minX) * scaleX);
+                int py = rc.bottom - margin - (int)((point.y - minY) * scaleY);
+                Ellipse(hdc, px - pointRadius, py - pointRadius, px + pointRadius, py + pointRadius);
+            }
+
+            SelectObject(hdc, hOldBrush);
+            DeleteObject(hPointBrush);
+            SelectObject(hdc, hOld);
+        }
+        EndPaint(hWnd, &ps);
+    }
+    break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
@@ -204,7 +258,6 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
         return (INT_PTR)TRUE;
-
     case WM_COMMAND:
         if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
         {

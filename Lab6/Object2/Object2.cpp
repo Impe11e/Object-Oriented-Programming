@@ -3,23 +3,44 @@
 #include <string>
 #include <sstream>
 #include <chrono>
+#include <shellapi.h>
+#include <fstream>
+#include <algorithm>
 
 #define MAX_LOADSTRING 100
+
+#define WM_APP_OBJECT2_READY    (WM_USER + 1)
+#define WM_APP_DATA_GENERATED   (WM_USER + 3)
+#define WM_APP_TOO_MANY_POINTS  (WM_USER + 5)
 
 HINSTANCE hInst;                                
 WCHAR szTitle[MAX_LOADSTRING];                  
 WCHAR szWindowClass[MAX_LOADSTRING];            
-
+HWND g_hParent = NULL;
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+
+static void AppendLog(const std::wstring &s)
+{
+    wchar_t modulePath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) return;
+    std::wstring path(modulePath);
+    size_t pos = path.find_last_of(L"\\/");
+    std::wstring dir = (pos == std::wstring::npos) ? L"." : path.substr(0, pos+1);
+    std::wstring log = dir + L"lab_debug.txt";
+    std::wofstream ofs(log, std::ios::app);
+    if (ofs) ofs << s << std::endl;
+}
 
 DataGenerator::DataGenerator()
 {
     rng.seed((unsigned)std::chrono::high_resolution_clock::now().time_since_epoch().count());
 }
 DataGenerator::~DataGenerator() {}
+
+static DataGenerator g_generator;
 
 void DataGenerator::GeneratePoints(int nPoints, int xMin, int xMax, int yMin, int yMax)
 {
@@ -28,19 +49,31 @@ void DataGenerator::GeneratePoints(int nPoints, int xMin, int xMax, int yMin, in
     if (xMax < xMin) std::swap(xMin, xMax);
     if (yMax < yMin) std::swap(yMin, yMax);
 
-    std::uniform_int_distribution<int> dx(xMin, xMax);
-    std::uniform_int_distribution<int> dy(yMin, yMax);
+    long maxUniqueX = (long)xMax - (long)xMin + 1;
+    if (maxUniqueX < 1) maxUniqueX = 1;
 
-    std::vector<int> xs;
-    xs.reserve(nPoints);
-    for (int i = 0; i < nPoints; ++i) xs.push_back(dx(rng));
-    std::sort(xs.begin(), xs.end());
-
-    for (int i = 0; i < nPoints; ++i)
+    if ((long)nPoints > maxUniqueX)
     {
-        int x = xs[i];
-        int y = dy(rng);
-        points.push_back({x, y});
+        nPoints = (int)maxUniqueX;
+    }
+
+    points.clear();
+    if (nPoints > 0)
+    {
+        std::vector<int> xs;
+        xs.reserve(xMax - xMin + 1);
+        for (int xx = xMin; xx <= xMax; ++xx) xs.push_back(xx);
+        std::shuffle(xs.begin(), xs.end(), rng);
+        xs.resize(nPoints);
+        std::sort(xs.begin(), xs.end());
+
+        std::uniform_int_distribution<int> dy(yMin, yMax);
+        for (int i = 0; i < nPoints; ++i)
+        {
+            int x = xs[i];
+            int y = dy(rng);
+            points.push_back({x, y});
+        }
     }
 }
 
@@ -62,17 +95,41 @@ bool DataGenerator::PutTextToClipboardW(HWND hWnd, const std::wstring &text)
 
 void DataGenerator::OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
+    AppendLog(L"OnCopyData called");
     COPYDATASTRUCT *cds = (COPYDATASTRUCT*)lParam;
     if (!cds) return;
     if (cds->cbData >= sizeof(long)*5)
     {
         long* p = (long*)cds->lpData;
-        int nPoints = (int)p[0];
+        int origNPoints = (int)p[0];
+        int nPoints = origNPoints;
         int xMin = (int)p[1];
         int xMax = (int)p[2];
         int yMin = (int)p[3];
         int yMax = (int)p[4];
-        GeneratePoints(nPoints, xMin, xMax, yMin, yMax);
+        std::wostringstream sslog; sslog << L"Params received: n=" << origNPoints << L" xMin=" << xMin << L" xMax=" << xMax << L" yMin=" << yMin << L" yMax=" << yMax; AppendLog(sslog.str());
+
+        long maxUniqueX = (long)xMax - (long)xMin + 1;
+        if (maxUniqueX < 1) maxUniqueX = 1;
+        bool reduced = false;
+        if ((long)nPoints > maxUniqueX) { nPoints = (int)maxUniqueX; reduced = true; }
+
+        points.clear();
+        if (nPoints > 0)
+        {
+            std::vector<int> xs;
+            xs.reserve(xMax - xMin + 1);
+            for (int xx = xMin; xx <= xMax; ++xx) xs.push_back(xx);
+            std::shuffle(xs.begin(), xs.end(), rng);
+            xs.resize(nPoints);
+            std::sort(xs.begin(), xs.end());
+
+            std::uniform_int_distribution<int> dy(yMin, yMax);
+            for (int i = 0; i < nPoints; ++i)
+            {
+                points.push_back({ xs[i], dy(rng) });
+            }
+        }
 
         std::wostringstream ss;
         for (auto &pt : points)
@@ -80,6 +137,16 @@ void DataGenerator::OnCopyData(HWND hWnd, WPARAM wParam, LPARAM lParam)
             ss << pt.x << L"\t" << pt.y << L"\r\n";
         }
         PutTextToClipboardW(hWnd, ss.str());
+        if (reduced && g_hParent)
+        {
+            PostMessage(g_hParent, WM_APP_TOO_MANY_POINTS, (WPARAM)origNPoints, (LPARAM)nPoints);
+            AppendLog(L"Posted WM_APP_TOO_MANY_POINTS");
+        }
+        if (g_hParent) {
+            PostMessage(g_hParent, WM_APP_DATA_GENERATED, 0, 0);
+            AppendLog(L"Posted WM_APP_DATA_GENERATED to parent");
+        }
+
         InvalidateRect(hWnd, NULL, TRUE);
     }
 }
@@ -90,17 +157,22 @@ void DataGenerator::OnPaint(HWND hWnd, HDC hdc)
     GetClientRect(hWnd, &rc);
     FillRect(hdc, &rc, (HBRUSH)(COLOR_WINDOW+1));
 
-    int y = 10;
+    TEXTMETRIC tm; GetTextMetrics(hdc, &tm);
+    int lineHeight = tm.tmHeight + tm.tmExternalLeading + 4;
+
+    int topMargin = 10;
+    int y = topMargin;
+    int idx = 1;
     for (auto &pt : points)
     {
         std::wostringstream ss;
-        ss << L"(" << pt.x << L", " << pt.y << L")";
+        ss << idx << L": (" << pt.x << L", " << pt.y << L")";
         std::wstring line = ss.str();
         TextOutW(hdc, 10, y, line.c_str(), (int)line.size());
-        y += 20;
+        y += lineHeight;
+        idx++;
     }
 }
-
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -108,7 +180,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_ int       nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
-    UNREFERENCED_PARAMETER(lpCmdLine);
+
+    int argc;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (argc > 1) {
+        g_hParent = (HWND)(UINT_PTR)_wtoi(argv[1]);
+    }
+    LocalFree(argv);
+
+    std::wostringstream s; s << L"Object2 start, parentHWND=" << (UINT_PTR)g_hParent; AppendLog(s.str());
 
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_OBJECT2, szWindowClass, MAX_LOADSTRING);
@@ -174,12 +254,16 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
-static DataGenerator g_generator;
-
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
+    case WM_CREATE:
+        if (g_hParent) {
+            PostMessage(g_hParent, WM_APP_OBJECT2_READY, (WPARAM)hWnd, 0);
+            AppendLog(L"Posted WM_APP_OBJECT2_READY to parent");
+        }
+        break;
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
