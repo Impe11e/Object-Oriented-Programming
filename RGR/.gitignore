@@ -33,8 +33,6 @@
 *.lastbuildstate
 # Visual Studio
 .vs/
-*.vcxproj*
-*.filters
 *.user
 *.suo
 *.db
