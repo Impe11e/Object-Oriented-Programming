@@ -9,3 +9,9 @@ User interface development in C++
 
 ## 4. Вдосконалення структури коду графічного редактора об’єктів на C++
 Improving the code structure of the C++ graphical object editor
+
+## 5. Розробка багатовіконного інтерфейсу користувача для графічного редактора об’єктів  
+Development of a multi-window user interface for a graphical object editor  
+
+## 6. Побудування програмної системи з множини об’єктів, керованих повідомленнями  
+Building a software system from a set of message-driven objects  
