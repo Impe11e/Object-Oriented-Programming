@@ -1,0 +1,47 @@
+# IDE
+.vs/
+*.user
+*.aps
+
+# Build dirs
+/x64/
+/x86/
+/Debug/
+/Release/
+/build/
+/[Bb]in/
+/[Oo]bj/
+
+# Build artifacts
+*.obj
+*.pdb
+*.idb
+*.opendb
+*.tlog
+*.log
+*.ilk
+*.pch
+*.ipch
+*.res
+*.exp
+*.lib
+*.dll
+*.exe
+*.exe.recipe
+*.enc
+*.cache
+*.lastbuildstate
+# Visual Studio
+.vs/
+*.vcxproj*
+*.filters
+*.user
+*.suo
+*.db
+*.opendb
+
+# Debug/Release directories
+Debug/
+Release/
+x64/
+x86/
