@@ -31,6 +31,8 @@ public:
     void SetModified(bool modified) { m_modified = modified; }
     HWND GetListViewHandle() const { return m_hListView; }
 
+    bool IsEditing() const { return m_isEditing; }
+
 private:
     std::vector<std::vector<std::wstring>> m_data;
     

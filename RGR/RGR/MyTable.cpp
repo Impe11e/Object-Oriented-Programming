@@ -417,6 +417,12 @@ LRESULT CALLBACK MyTableClass::EditSubclassProc(HWND hwnd, UINT msg, WPARAM wPar
             pTable->EndEdit(false);
             return 0;
         }
+        else if (wParam == 'Z' && (GetKeyState(VK_CONTROL) & 0x8000))
+        {
+            // Ctrl+Z while editing: treat as cancel (like Esc)
+            pTable->EndEdit(false);
+            return 0;
+        }
         break;
         
     case WM_KILLFOCUS:

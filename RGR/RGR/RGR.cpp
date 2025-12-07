@@ -9,6 +9,7 @@ HINSTANCE hInst;
 WCHAR szTitle[MAX_LOADSTRING];                  
 WCHAR szWindowClass[MAX_LOADSTRING];            
 MyTableClass* g_pTable = nullptr;               
+HWND g_hMainWnd = nullptr;
 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -41,7 +42,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     while (GetMessage(&msg, nullptr, 0, 0))
     {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+        bool isEditing = (g_pTable && g_pTable->IsEditing());
+
+        if (!isEditing && !TranslateAccelerator(g_hMainWnd ? g_hMainWnd : msg.hwnd, hAccelTable, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else if (isEditing)
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
@@ -83,6 +91,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    {
       return FALSE;
    }
+
+   g_hMainWnd = hWnd;
 
    g_pTable = new MyTableClass(hWnd, hInstance);
 
