@@ -150,13 +150,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
         
-    case WM_KEYDOWN:
-        if (g_pTable)
-        {
-            g_pTable->OnKeyDown(wParam);
-        }
-        break;
-        
     case WM_DESTROY:
         if (g_pTable)
         {
@@ -196,7 +189,7 @@ void OnFileOpen(HWND hWnd)
         }
         else
         {
-            MessageBoxW(hWnd, L"Не вдалося завантажити файл!", L"Помилка", MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, L"Failed to download file!", L"Error", MB_OK | MB_ICONERROR);
         }
     }
 }
@@ -205,7 +198,7 @@ void OnFileSave(HWND hWnd)
 {
     if (!g_pTable || !g_pTable->HasData())
     {
-        MessageBoxW(hWnd, L"Немає даних для збереження!", L"Увага", MB_OK | MB_ICONWARNING);
+        MessageBoxW(hWnd, L"No data to save!", L"Warning", MB_OK | MB_ICONWARNING);
         return;
     }
     
@@ -214,11 +207,11 @@ void OnFileSave(HWND hWnd)
     {
         if (g_pTable->SaveToFile(filename))
         {
-            MessageBoxW(hWnd, L"Файл успішно збережено!", L"Інформація", MB_OK | MB_ICONINFORMATION);
+            MessageBoxW(hWnd, L"File saved successfully!", L"Information", MB_OK | MB_ICONINFORMATION);
         }
         else
         {
-            MessageBoxW(hWnd, L"Не вдалося зберегти файл!", L"Помилка", MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, L"Failed to save file!", L"Error", MB_OK | MB_ICONERROR);
         }
     }
     else
@@ -231,7 +224,7 @@ void OnFileSaveAs(HWND hWnd)
 {
     if (!g_pTable || !g_pTable->HasData())
     {
-        MessageBoxW(hWnd, L"Немає даних для збереження!", L"Увага", MB_OK | MB_ICONWARNING);
+        MessageBoxW(hWnd, L"No data to save!", L"Warning", MB_OK | MB_ICONWARNING);
         return;
     }
     
@@ -254,11 +247,11 @@ void OnFileSaveAs(HWND hWnd)
     {
         if (g_pTable->SaveToFileAs(szFile))
         {
-            MessageBoxW(hWnd, L"Файл успішно збережено!", L"Інформація", MB_OK | MB_ICONINFORMATION);
+            MessageBoxW(hWnd, L"File saved successfully!", L"Information", MB_OK | MB_ICONINFORMATION);
         }
         else
         {
-            MessageBoxW(hWnd, L"Не вдалося зберегти файл!", L"Помилка", MB_OK | MB_ICONERROR);
+            MessageBoxW(hWnd, L"Failed to save file!", L"Error", MB_OK | MB_ICONERROR);
         }
     }
 }

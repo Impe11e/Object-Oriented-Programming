@@ -1,9 +1,9 @@
 #include "MyTable.h"
+#include "Utils.h"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <windowsx.h>
-#include <codecvt>
 
 MyTableClass::MyTableClass(HWND hParentWnd, HINSTANCE hInst)
     : m_hParentWnd(hParentWnd)
@@ -14,7 +14,6 @@ MyTableClass::MyTableClass(HWND hParentWnd, HINSTANCE hInst)
     , m_editCol(-1)
     , m_isEditing(false)
     , m_modified(false)
-    , m_oldListViewProc(nullptr)
 {
     CreateListView();
 }
@@ -26,13 +25,9 @@ MyTableClass::~MyTableClass()
         DestroyWindow(m_hEditWnd);
     }
     
-    if (m_hListView && m_oldListViewProc)
-    {
-        SetWindowLongPtr(m_hListView, GWLP_WNDPROC, (LONG_PTR)m_oldListViewProc);
-    }
-    
     if (m_hListView)
     {
+        RemoveWindowSubclass(m_hListView, ListViewSubclassProc, 1);
         DestroyWindow(m_hListView);
     }
 }
@@ -59,9 +54,7 @@ void MyTableClass::CreateListView()
             LVS_EX_GRIDLINES |        
             LVS_EX_DOUBLEBUFFER);     
         
-        m_oldListViewProc = (WNDPROC)SetWindowLongPtr(m_hListView, 
-            GWLP_WNDPROC, (LONG_PTR)ListViewSubclassProc);
-        SetWindowLongPtr(m_hListView, GWLP_USERDATA, (LONG_PTR)this);
+        SetWindowSubclass(m_hListView, ListViewSubclassProc, 1, (DWORD_PTR)this);
     }
 }
 
@@ -80,7 +73,8 @@ void MyTableClass::InitializeColumns()
     lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
     lvc.fmt = LVCFMT_CENTER;
     lvc.cx = 50;
-    lvc.pszText = (LPWSTR)L"¹";
+    auto bufNum = MakeNullTerminated(L"¹");
+    lvc.pszText = bufNum.data();
     ListView_InsertColumn(m_hListView, 0, &lvc);
     
     for (size_t i = 0; i < m_data[0].size(); i++)
@@ -88,7 +82,8 @@ void MyTableClass::InitializeColumns()
         lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
         lvc.fmt = LVCFMT_LEFT;
         lvc.cx = 120;
-        lvc.pszText = (LPWSTR)m_data[0][i].c_str();
+        auto buf = MakeNullTerminated(m_data[0][i]);
+        lvc.pszText = buf.data();
         ListView_InsertColumn(m_hListView, (int)i + 1, &lvc);
     }
 }
@@ -116,8 +111,8 @@ void MyTableClass::FillListView()
         
         for (size_t col = 0; col < m_data[row].size(); col++)
         {
-            ListView_SetItemText(m_hListView, itemIndex, (int)col + 1, 
-                                (LPWSTR)m_data[row][col].c_str());
+            auto buf = MakeNullTerminated(m_data[row][col]);
+            ListView_SetItemText(m_hListView, itemIndex, (int)col + 1, buf.data());
         }
     }
 }
@@ -128,7 +123,7 @@ bool MyTableClass::LoadFromFile(const wchar_t* filename)
     if (!file.is_open())
         return false;
 
-    file.imbue(std::locale(file.getloc(), new std::codecvt_utf8<wchar_t>));
+    ImbueUtf8(file);
 
     m_data.clear();
     std::wstring line;
@@ -192,7 +187,7 @@ bool MyTableClass::SaveToFile(const wchar_t* filename)
     if (!file.is_open())
         return false;
     
-    file.imbue(std::locale(file.getloc(), new std::codecvt_utf8<wchar_t>));
+    ImbueUtf8(file);
     
     for (size_t i = 0; i < m_data.size(); ++i)
     {
@@ -314,7 +309,8 @@ void MyTableClass::EndEdit(bool save)
                 
                 int listRow = m_editRow - 1; 
                 int listCol = m_editCol + 1; 
-                ListView_SetItemText(m_hListView, listRow, listCol, (LPWSTR)newText.c_str());
+                auto buf = MakeNullTerminated(newText);
+                ListView_SetItemText(m_hListView, listRow, listCol, buf.data());
             }
         }
     }
@@ -369,7 +365,8 @@ void MyTableClass::Undo()
         
         int listRow = state.row - 1;
         int listCol = state.col + 1;
-        ListView_SetItemText(m_hListView, listRow, listCol, (LPWSTR)state.oldValue.c_str());
+        auto buf = MakeNullTerminated(state.oldValue);
+        ListView_SetItemText(m_hListView, listRow, listCol, buf.data());
     }
 }
 
@@ -387,14 +384,6 @@ void MyTableClass::OnNotify(LPARAM lParam)
                 BeginEdit(lpnmitem->iItem, lpnmitem->iSubItem);
             }
         }
-    }
-}
-
-void MyTableClass::OnKeyDown(WPARAM wParam)
-{
-    if (wParam == 'Z' && (GetKeyState(VK_CONTROL) & 0x8000))
-    {
-        Undo();
     }
 }
 
@@ -417,12 +406,6 @@ LRESULT CALLBACK MyTableClass::EditSubclassProc(HWND hwnd, UINT msg, WPARAM wPar
             pTable->EndEdit(false);
             return 0;
         }
-        else if (wParam == 'Z' && (GetKeyState(VK_CONTROL) & 0x8000))
-        {
-            // Ctrl+Z while editing: treat as cancel (like Esc)
-            pTable->EndEdit(false);
-            return 0;
-        }
         break;
         
     case WM_KILLFOCUS:
@@ -437,7 +420,7 @@ LRESULT CALLBACK MyTableClass::ListViewSubclassProc(HWND hwnd, UINT msg, WPARAM 
                                                       LPARAM lParam, UINT_PTR uIdSubclass,
                                                       DWORD_PTR dwRefData)
 {
-    MyTableClass* pTable = (MyTableClass*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+    MyTableClass* pTable = (MyTableClass*)dwRefData;
     
     switch (msg)
     {
@@ -450,5 +433,5 @@ LRESULT CALLBACK MyTableClass::ListViewSubclassProc(HWND hwnd, UINT msg, WPARAM 
         break;
     }
     
-    return CallWindowProc(pTable->m_oldListViewProc, hwnd, msg, wParam, lParam);
+    return DefSubclassProc(hwnd, msg, wParam, lParam);
 }

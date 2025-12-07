@@ -128,10 +128,12 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RGR.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MyTable.cpp" />
     <ClCompile Include="RGR.cpp" />
+    <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="RGR.rc" />

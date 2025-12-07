@@ -22,7 +22,6 @@ public:
     
     void OnSize(int width, int height);
     void OnNotify(LPARAM lParam);
-    void OnKeyDown(WPARAM wParam);  
     
     bool HasData() const { return !m_data.empty(); }
     const wchar_t* GetCurrentFileName() const { return m_currentFileName.c_str(); }
@@ -44,7 +43,6 @@ private:
     int m_editRow;
     int m_editCol;
     bool m_isEditing;
-    WNDPROC m_oldListViewProc;
     
     struct UndoState {
         int row;
